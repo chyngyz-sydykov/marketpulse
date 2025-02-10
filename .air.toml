@@ -1,0 +1,21 @@
+# .air.toml
+
+# Build settings
+[build]
+cmd = "go build -mod=readonly -o ./bin/main ./cmd"
+bin = "bin/main"
+full_bin = "./bin/main"
+
+# Watch settings
+[watch]
+# Add directories or files to watch for changes
+include_dir = ["."]
+exclude_dir = [".git",".github", "bin", "vendor", "tests", "docker", "githooks", "tmp"]
+
+# Exclude any non-Go files if necessary
+extensions = ["go"]
+
+# Watch settings
+[log]
+# Make sure log level allows for output
+#level = "debug" # Options: debug, info, warn, error

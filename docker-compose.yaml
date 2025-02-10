@@ -1,0 +1,63 @@
+services:
+  golang:
+    build: docker/
+    container_name: marketpulse
+    # ports:
+    #   - "${APPLICATION_PORT}:${APPLICATION_PORT}"
+    volumes:
+      - .:/app
+      - /app/bin
+    environment:
+      - APP_ENV=development
+      - ROOT_DIR=/app
+    depends_on:
+      - db
+    networks:
+      default:
+  db:
+    image: postgres
+    restart: always
+    container_name: marketpulse_postgres
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT_EXTERNAL}:${DB_PORT}"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - '-q'
+        - '-d'
+        - '${DB_DATABASE}'
+        - '-U'
+        - '${DB_USERNAME}'
+      retries: 3
+      timeout: 5s
+    networks:
+      default:
+  # rabbitmq:
+  #   image: rabbitmq:4-management
+  #   container_name: go_web_rabbitmq
+  #   ports:
+  #     - "5672:5672"   # RabbitMQ message broker port
+  #     - "15672:15672" # RabbitMQ management console port
+  #   environment:
+  #     - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+  #     - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+  #   volumes:
+  #     - rabbitmq-data:/var/lib/rabbitmq
+  #   networks:
+  #     default:
+
+volumes:
+  db-data:
+  # rabbitmq-data:
+
+# networks:
+#   default:
+#       name: grpc-network
+#       external: true
