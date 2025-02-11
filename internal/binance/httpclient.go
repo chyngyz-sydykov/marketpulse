@@ -41,8 +41,8 @@ func (m *BinanceMockTransport) RoundTrip(req *http.Request) (*http.Response, err
 				"lowPrice":           "96866.39000000",
 				"volume":             "17212.93500000",
 				"quoteVolume":        "1679589982.48793910",
-				"openTime":           time.Now().Add(-1 * time.Hour).Unix(),
-				"closeTime":          time.Now().Unix(),
+				"openTime":           time.Now().Add(-1*time.Hour).Unix() * 1000,
+				"closeTime":          time.Now().Unix() * 1000,
 				"firstId":            4541889495,
 				"lastId":             4544959049,
 				"count":              3069555,
@@ -50,18 +50,18 @@ func (m *BinanceMockTransport) RoundTrip(req *http.Request) (*http.Response, err
 		} else if strings.Contains(req.URL.Path, "klines") {
 			mockBody, _ = json.Marshal([][]interface{}{
 				{
-					time.Now().Add(-1 * time.Hour).Unix(), // Kline open time
-					"98412.00000000",                      // Open price
-					"98432.00000000",                      // High price
-					"98135.11111111",                      // Low price
-					"98435.11111111",                      // Close price
-					"319.17738000",                        // Volume
-					time.Now().Unix(),                     // Kline Close time
-					"31371060.16996650",                   // Quote asset volume
-					60295,                                 // Number of trades
-					"141.91034000",                        // Taker buy base asset volume
-					"13947601.85652800",                   // Taker buy quote asset volume
-					"0",                                   // Unused field, ignore.
+					time.Now().Add(-1*time.Hour).Unix() * 1000, // Kline open time
+					"98412.00000000",         // Open price
+					"98432.00000000",         // High price
+					"98135.11111111",         // Low price
+					"98435.11111111",         // Close price
+					"319.17738000",           // Volume
+					time.Now().Unix() * 1000, // Kline Close time
+					"31371060.16996650",      // Quote asset volume
+					60295,                    // Number of trades
+					"141.91034000",           // Taker buy base asset volume
+					"13947601.85652800",      // Taker buy quote asset volume
+					"0",                      // Unused field, ignore.
 				},
 			})
 		} else {

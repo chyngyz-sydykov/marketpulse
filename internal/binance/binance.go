@@ -75,6 +75,7 @@ func FetchKline(currency string) (*RecordDto, error) {
 	}
 
 	body, err := io.ReadAll(resp.Body)
+	//fmt.Println("body:", string(body))
 	if err != nil {
 		return nil, err
 	}
@@ -89,10 +90,9 @@ func FetchKline(currency string) (*RecordDto, error) {
 	}
 
 	firstElement := binanceKlineData[0]
-
 	return &RecordDto{
 		Symbol:    strings.ToUpper(currency) + "USDT",
-		Timestamp: time.Unix(int64(firstElement[0].(float64))/1000, 0), // Kline open time
+		Timestamp: time.Unix(int64(firstElement[0].(float64))/1000, 0).Truncate(time.Hour), // Kline open time with precision to hour
 		Timeframe: config.ONE_HOUR,
 		Open:      parseFloat(firstElement[1].(string)), // Open price
 		High:      parseFloat(firstElement[2].(string)), // High price
