@@ -12,7 +12,8 @@ COPY . .
 #RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest \
     && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest \
-    && go install github.com/air-verse/air@latest
+    && go install github.com/air-verse/air@latest \
+    && go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Set the Current Working Directory inside the container
 
@@ -23,7 +24,7 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest \
 # USER golang
 # COPY --chown=golang:golang . .
 
-EXPOSE 8000
+EXPOSE 8000 40000
 
 # Run the executable
-CMD ["air", "-d", "-c", ".air.toml"]
+CMD ["air", "-c", ".air.toml"]

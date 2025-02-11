@@ -17,12 +17,12 @@ func StartScheduler() {
 	// Schedule market data fetching every hour
 	scheduler.Every(1).Hour().Do(func() {
 		log.Println("Fetching market data...")
-		data, err := binance.FetchMarketData()
+		data, err := binance.FetchTicker("btc")
 		if err != nil {
 			log.Println("Error fetching market data:", err)
 			return
 		}
-		err = repository.StoreMarketData(data)
+		err = repository.StoreMarketData("btc", data)
 		if err != nil {
 			log.Println("Error storing market data:", err)
 		}
