@@ -1,4 +1,4 @@
-package repository
+package marketdata
 
 import (
 	"fmt"
@@ -10,8 +10,15 @@ import (
 	"github.com/chyngyz-sydykov/marketpulse/internal/database"
 )
 
+type MarketDataRepository struct {
+}
+
+func NewMarketDataRepository() *MarketDataRepository {
+	return &MarketDataRepository{}
+}
+
 // StoreMarketData saves Binance market data to PostgreSQL
-func StoreMarketData(currency string, data *binance.RecordDto) error {
+func (repository *MarketDataRepository) StoreData(currency string, data *binance.RecordDto) error {
 	if !slices.Contains(config.DefaultCurrencies, currency) {
 		return fmt.Errorf("unknown currency: %s", currency)
 	} else {
@@ -39,5 +46,4 @@ func StoreMarketData(currency string, data *binance.RecordDto) error {
 		log.Println("Market data stored successfully!")
 		return nil
 	}
-	return nil
 }

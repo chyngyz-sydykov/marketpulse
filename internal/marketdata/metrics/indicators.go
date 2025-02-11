@@ -1,14 +1,21 @@
-package metrics
+package marketdata
 
 import "math"
 
+type Indicator struct {
+}
+
+func NewIndicator() *Indicator {
+	return &Indicator{}
+}
+
 // Calculate OHLC (dummy for now)
-func CalculateOHLC(open, high, low, close []float64) (float64, float64, float64, float64) {
+func (indicator *Indicator) CalculateOHLC(open, high, low, close []float64) (float64, float64, float64, float64) {
 	return open[0], high[0], low[0], close[len(close)-1]
 }
 
 // Simple Moving Average (SMA)
-func SMA(prices []float64, period int) float64 {
+func (indicator *Indicator) SMA(prices []float64, period int) float64 {
 	if len(prices) < period {
 		return 0
 	}
@@ -20,7 +27,7 @@ func SMA(prices []float64, period int) float64 {
 }
 
 // Exponential Moving Average (EMA)
-func EMA(prices []float64, period int) float64 {
+func (indicator *Indicator) EMA(prices []float64, period int) float64 {
 	if len(prices) < period {
 		return 0
 	}
@@ -33,8 +40,8 @@ func EMA(prices []float64, period int) float64 {
 }
 
 // Standard Deviation
-func StandardDeviation(prices []float64) float64 {
-	mean := SMA(prices, len(prices))
+func (indicator *Indicator) StandardDeviation(prices []float64) float64 {
+	mean := indicator.SMA(prices, len(prices))
 	var sum float64
 	for _, price := range prices {
 		sum += math.Pow(price-mean, 2)
@@ -43,14 +50,14 @@ func StandardDeviation(prices []float64) float64 {
 }
 
 // Bollinger Bands
-func BollingerBands(prices []float64, period int) (float64, float64) {
-	sma := SMA(prices, period)
-	stddev := StandardDeviation(prices)
+func (indicator *Indicator) BollingerBands(prices []float64, period int) (float64, float64) {
+	sma := indicator.SMA(prices, period)
+	stddev := indicator.StandardDeviation(prices)
 	return sma - 2*stddev, sma + 2*stddev
 }
 
 // RSI (Relative Strength Index)
-func RSI(prices []float64, period int) float64 {
+func (indicator *Indicator) RSI(prices []float64, period int) float64 {
 	if len(prices) < period {
 		return 0
 	}

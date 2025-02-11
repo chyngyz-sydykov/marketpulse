@@ -8,7 +8,7 @@ import (
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
 	"github.com/chyngyz-sydykov/marketpulse/internal/database"
-	"github.com/chyngyz-sydykov/marketpulse/internal/repository"
+	"github.com/chyngyz-sydykov/marketpulse/internal/marketdata"
 )
 
 func main() {
@@ -17,6 +17,8 @@ func main() {
 		log.Fatal("Failed to connect to database:", err)
 	}
 	defer database.DB.Close()
+
+	marketDataService := marketdata.NewMarketDataService()
 
 	// Start the scheduler to fetch market data every hour
 	//scheduler.StartScheduler()
@@ -33,7 +35,7 @@ func main() {
 				return
 			}
 
-			err = repository.StoreMarketData(curr, record)
+			err = marketDataService.StoreMarketData(curr, record)
 			if err != nil {
 				log.Printf("Error storing data for %s: %v\n", curr, err)
 				return
