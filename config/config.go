@@ -7,7 +7,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var DefaultCurrencies = []string{"btc", "eth", "bnb", "sol", "trump"}
+// var DefaultCurrencies = []string{"btc", "eth", "bnb", "sol", "trump"}
+var DefaultCurrencies = []string{"btc"}
 var DefaultTimeframes = []string{"1h", "4h", "1d", "1w", "1m"}
 var ONE_HOUR = "1h"
 var FOUR_HOUR = "4h"

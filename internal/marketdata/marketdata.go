@@ -2,31 +2,70 @@ package marketdata
 
 import (
 	"fmt"
+	"log"
 	"slices"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
-	marketdata "github.com/chyngyz-sydykov/marketpulse/internal/marketdata/indicator"
+	aggregator "github.com/chyngyz-sydykov/marketpulse/internal/marketdata/aggregator"
+	indicator "github.com/chyngyz-sydykov/marketpulse/internal/marketdata/indicator"
 )
 
 type MarketDataService struct {
 	repository MarketDataRepository
-	indicator  marketdata.Indicator
+	indicator  indicator.Indicator
+	aggregator aggregator.Aggregator
 }
 
 func NewMarketDataService() *MarketDataService {
 	repository := NewMarketDataRepository()
-	indicator := marketdata.NewIndicator()
+	indicator := indicator.NewIndicator()
+	aggregator := aggregator.NewAggregator()
 	return &MarketDataService{
 		repository: *repository,
 		indicator:  *indicator,
+		aggregator: *aggregator,
 	}
 }
 
-func (service *MarketDataService) StoreDataWithIndicator(currency string, data *binance.RecordDto) error {
-	_, err := service.indicator.CalculateAllIndicators(data)
-	//service.repository.StoreData(currency, data)
-	return err
+func (service *MarketDataService) Store4HourRecords(currency string) error {
+
+	last4HourRecord, err := service.repository.getLastRecord(currency, config.FOUR_HOUR)
+	if err != nil {
+		return err
+	}
+	//fmt.Println("last 4h record:", currency, last4HourRecord)
+	var oneHourRecords []binance.RecordDto
+
+	if last4HourRecord == nil {
+		// No previous 4-hour record → Fetch all 1-hour records
+		oneHourRecords, err = service.repository.getRecords(currency, config.ONE_HOUR) // Get all
+	} else {
+		// Fetch only 1-hour records after the last 4-hour timestamp
+		oneHourRecords, err = service.repository.getRecordsAfter(currency, config.ONE_HOUR, last4HourRecord.Timestamp)
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(oneHourRecords) < 4 {
+		log.Printf("Not enough 1-hour records to create a 4-hour record for %s", currency)
+		return nil
+	}
+
+	var aggregatedRecords []binance.RecordDto
+	for i := 0; i+3 < len(oneHourRecords); i += 4 {
+		group := oneHourRecords[i : i+4]
+		aggregatedRecord := service.aggregator.Aggregate(group, config.FOUR_HOUR)
+		aggregatedRecords = append(aggregatedRecords, aggregatedRecord)
+	}
+
+	// Insert aggregated records into the 4-hour table
+	err = service.repository.storeDataBatch(currency, aggregatedRecords)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (service *MarketDataService) StoreMarketData(currency string, data *binance.RecordDto) error {

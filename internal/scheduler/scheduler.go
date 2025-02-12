@@ -2,8 +2,10 @@ package scheduler
 
 import (
 	"log"
+	"sync"
 	"time"
 
+	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
 	"github.com/chyngyz-sydykov/marketpulse/internal/marketdata"
 
@@ -13,20 +15,30 @@ import (
 // StartScheduler initializes a gocron job to fetch market data every hour
 func StartScheduler() {
 	scheduler := gocron.NewScheduler(time.UTC)
-
 	marketDataService := marketdata.NewMarketDataService()
 
-	// Schedule market data fetching every hour
 	scheduler.Every(1).Hour().Do(func() {
-		log.Println("Fetching market data...")
-		data, err := binance.FetchTicker("btc")
-		if err != nil {
-			log.Println("Error fetching market data:", err)
-			return
-		}
-		err = marketDataService.StoreMarketData("btc", data)
-		if err != nil {
-			log.Println("Error storing market data:", err)
+		log.Println("hourly scheduler...")
+		var wg sync.WaitGroup
+		for _, currency := range config.DefaultCurrencies {
+			wg.Add(1)
+			go func(curr string) {
+
+				defer wg.Done()
+
+				record, err := binance.FetchKline(curr)
+				if err != nil {
+					log.Printf("Error fetching data for %s: %v\n", curr, err)
+					return
+				}
+
+				err = marketDataService.StoreMarketData(curr, record)
+				if err != nil {
+					log.Printf("Error storing data for %s: %v\n", curr, err)
+					return
+				}
+
+			}(currency)
 		}
 	})
 
