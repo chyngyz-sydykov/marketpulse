@@ -1,6 +1,10 @@
 package marketdata
 
-import "math"
+import (
+	"math"
+
+	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
+)
 
 type Indicator struct {
 }
@@ -9,9 +13,35 @@ func NewIndicator() *Indicator {
 	return &Indicator{}
 }
 
-// Calculate OHLC (dummy for now)
-func (indicator *Indicator) CalculateOHLC(open, high, low, close []float64) (float64, float64, float64, float64) {
-	return open[0], high[0], low[0], close[len(close)-1]
+func (indicator *Indicator) CalculateAllIndicators(data *binance.RecordDto) (*binance.IndicatorDto, error) {
+	//return &binance.IndicatorDto{}, nil
+	prices := []float64{data.Open, data.High, data.Low, data.Close} // Example: Use actual historical prices
+
+	// Compute each indicator sequentially
+	sma := indicator.SMA(prices, 14)
+	ema := indicator.EMA(prices, 14)
+	stdDev := indicator.StandardDeviation(prices)
+	lowerBollinger := sma - 2*stdDev
+	upperBollinger := sma + 2*stdDev
+	rsi := indicator.RSI(prices, 14)
+	volatility := (data.High - data.Low) / data.Close
+	macd := indicator.MACD(prices, 12, 26)
+	macdSignal := indicator.MACDSignal(prices, 9)
+
+	// Store results in IndicatorDto
+	indicatorDto := &binance.IndicatorDto{
+		SMA:            sma,
+		EMA:            ema,
+		StdDev:         stdDev,
+		LowerBollinger: lowerBollinger,
+		UpperBollinger: upperBollinger,
+		RSI:            rsi,
+		Volatility:     volatility,
+		MACD:           macd,
+		MACDSignal:     macdSignal,
+	}
+
+	return indicatorDto, nil
 }
 
 // Simple Moving Average (SMA)
@@ -77,4 +107,16 @@ func (indicator *Indicator) RSI(prices []float64, period int) float64 {
 	}
 	rs := avgGain / avgLoss
 	return 100 - (100 / (1 + rs))
+}
+func (indicator *Indicator) MACD(prices []float64, shortPeriod, longPeriod int) float64 {
+	return indicator.EMA(prices, shortPeriod) - indicator.EMA(prices, longPeriod)
+}
+
+// MACD Signal Line (9-period EMA of MACD)
+func (indicator *Indicator) MACDSignal(prices []float64, signalPeriod int) float64 {
+	macdValues := make([]float64, len(prices))
+	for i := range prices {
+		macdValues[i] = indicator.MACD(prices[:i+1], 12, 26)
+	}
+	return indicator.EMA(macdValues, signalPeriod)
 }

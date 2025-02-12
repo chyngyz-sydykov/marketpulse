@@ -8,6 +8,7 @@ import (
 )
 
 var DefaultCurrencies = []string{"btc", "eth", "bnb", "sol", "trump"}
+var DefaultTimeframes = []string{"1h", "4h", "1d", "1w", "1m"}
 var ONE_HOUR = "1h"
 var FOUR_HOUR = "4h"
 var ONE_DAY = "1d"
