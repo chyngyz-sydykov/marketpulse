@@ -11,13 +11,9 @@ CREATE TABLE IF NOT EXISTS indicator_btc (
     rsi NUMERIC NOT NULL,
     macd NUMERIC NOT NULL,
     macd_signal NUMERIC NOT NULL,
-    data_id bigint not null,
-    data_timeframe TEXT NOT NULL,
-    PRIMARY KEY (id, timeframe),
-    FOREIGN KEY (data_id, data_timeframe) REFERENCES data_btc (id, timeframe) ON DELETE CASCADE
+    data_timestamp TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (id, timeframe)
 ) PARTITION BY LIST (timeframe);
-
-CREATE INDEX idx_indicator_btc_data_id_timeframe ON indicator_btc (data_id DESC, timeframe);
 
 CREATE TABLE IF NOT EXISTS indicator_bnb (
     id BIGSERIAL,
@@ -32,13 +28,9 @@ CREATE TABLE IF NOT EXISTS indicator_bnb (
     rsi NUMERIC NOT NULL,
     macd NUMERIC NOT NULL,
     macd_signal NUMERIC NOT NULL,
-    data_id bigint not null,
-    data_timeframe TEXT NOT NULL,
-    PRIMARY KEY (id, timeframe),
-    FOREIGN KEY (data_id, data_timeframe) REFERENCES data_bnb (id, timeframe) ON DELETE CASCADE
+    data_timestamp TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (id, timeframe)
 ) PARTITION BY LIST (timeframe);
-
-CREATE INDEX idx_indicator_bnb_data_id_timeframe ON indicator_bnb (data_id DESC, timeframe);
 
 CREATE TABLE IF NOT EXISTS indicator_eth (
     id BIGSERIAL,
@@ -53,13 +45,9 @@ CREATE TABLE IF NOT EXISTS indicator_eth (
     rsi NUMERIC NOT NULL,
     macd NUMERIC NOT NULL,
     macd_signal NUMERIC NOT NULL,
-    data_id bigint not null,
-    data_timeframe TEXT NOT NULL,
-    PRIMARY KEY (id, timeframe),
-    FOREIGN KEY (data_id, data_timeframe) REFERENCES data_eth (id, timeframe) ON DELETE CASCADE
+    data_timestamp TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (id, timeframe)
 ) PARTITION BY LIST (timeframe);
-
-CREATE INDEX idx_indicator_eth_data_id_timeframe ON indicator_eth (data_id DESC, timeframe);
 
 CREATE TABLE IF NOT EXISTS indicator_sol (
     id BIGSERIAL,
@@ -74,13 +62,9 @@ CREATE TABLE IF NOT EXISTS indicator_sol (
     rsi NUMERIC NOT NULL,
     macd NUMERIC NOT NULL,
     macd_signal NUMERIC NOT NULL,
-    data_id bigint not null,
-    data_timeframe TEXT NOT NULL,
-    PRIMARY KEY (id, timeframe),
-    FOREIGN KEY (data_id, data_timeframe) REFERENCES data_sol (id, timeframe) ON DELETE CASCADE
+    data_timestamp TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (id, timeframe)
 ) PARTITION BY LIST (timeframe);
-
-CREATE INDEX idx_indicator_sol_data_id_timeframe ON indicator_sol (data_id DESC, timeframe);
 
 CREATE TABLE IF NOT EXISTS indicator_trump (
     id BIGSERIAL,
@@ -95,10 +79,6 @@ CREATE TABLE IF NOT EXISTS indicator_trump (
     rsi NUMERIC NOT NULL,
     macd NUMERIC NOT NULL,
     macd_signal NUMERIC NOT NULL,
-    data_id bigint not null,
-    data_timeframe TEXT NOT NULL,
-    PRIMARY KEY (id, timeframe),
-    FOREIGN KEY (data_id, data_timeframe) REFERENCES data_trump (id, timeframe) ON DELETE CASCADE
+    data_timestamp TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (id, timeframe)
 ) PARTITION BY LIST (timeframe);
-
-CREATE INDEX idx_indicator_trump_data_id_timeframe ON indicator_trump (data_id DESC, timeframe);

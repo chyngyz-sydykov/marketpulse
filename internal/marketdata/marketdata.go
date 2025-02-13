@@ -34,7 +34,6 @@ func (service *MarketDataService) Store4HourRecords(currency string) error {
 	if err != nil {
 		return err
 	}
-	//fmt.Println("last 4h record:", currency, last4HourRecord)
 	var oneHourRecords []binance.RecordDto
 
 	if last4HourRecord == nil {
@@ -49,15 +48,20 @@ func (service *MarketDataService) Store4HourRecords(currency string) error {
 	}
 
 	if len(oneHourRecords) < 4 {
-		log.Printf("Not enough 1-hour records to create a 4-hour record for %s", currency)
+		log.Printf(config.COLOR_YELLOW+"not enough 1-hour records for %s to create a 4-hour record"+config.COLOR_RESET, currency)
 		return nil
 	}
 
-	var aggregatedRecords []binance.RecordDto
+	var aggregatedRecords []*binance.RecordDto
 	for i := 0; i+3 < len(oneHourRecords); i += 4 {
 		group := oneHourRecords[i : i+4]
 		aggregatedRecord := service.aggregator.Aggregate(group, config.FOUR_HOUR)
+		aggregatedRecord.Trend = service.indicator.Trend(aggregatedRecord)
 		aggregatedRecords = append(aggregatedRecords, aggregatedRecord)
+
+		// calculate indicators for a group of 4 records
+		// save it to indicator table
+		_, _ = service.indicator.CalculateAllIndicators(group)
 	}
 
 	// Insert aggregated records into the 4-hour table
@@ -81,7 +85,7 @@ func (service *MarketDataService) StoreData(currency string, data *binance.Recor
 			return err
 		}
 		if exists {
-			fmt.Printf("data already exists for currency: %s, timeframe: %s, timestamp: %s\n", currency, data.Timeframe, data.Timestamp)
+			log.Printf(config.COLOR_YELLOW+"data already exists for %s %s %s\n"+config.COLOR_RESET, currency, data.Timeframe, data.Timestamp)
 			return nil
 		}
 

@@ -158,7 +158,7 @@ func (repository *MarketDataRepository) storeData(currency string, data *binance
 	}
 }
 
-func (repository *MarketDataRepository) storeDataBatch(currency string, records []binance.RecordDto) error {
+func (repository *MarketDataRepository) storeDataBatch(currency string, records []*binance.RecordDto) error {
 	if !slices.Contains(config.DefaultCurrencies, currency) {
 		return fmt.Errorf("unknown currency: %s", currency)
 	} else if len(records) == 0 {

@@ -1,8 +1,10 @@
 package indicator
 
 import (
+	"log"
 	"math"
 
+	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
 )
 
@@ -13,20 +15,28 @@ func NewIndicator() *Indicator {
 	return &Indicator{}
 }
 
-func (indicator *Indicator) CalculateAllIndicators(data *binance.RecordDto) (*binance.IndicatorDto, error) {
-	//return &binance.IndicatorDto{}, nil
-	prices := []float64{data.Open, data.High, data.Low, data.Close} // Example: Use actual historical prices
+func (indicator *Indicator) CalculateAllIndicators(history []binance.RecordDto) (*binance.IndicatorDto, error) {
+	// Extract close prices from historical data
+	var closePrices []float64
+	for _, record := range history {
+		closePrices = append(closePrices, record.Close)
+	}
 
-	// Compute each indicator sequentially
-	sma := indicator.SMA(prices, 14)
-	ema := indicator.EMA(prices, 14)
-	stdDev := indicator.StandardDeviation(prices)
+	if len(closePrices) == 0 {
+		log.Printf("%s", config.COLOR_YELLOW+"not enough data to calculate indicators"+config.COLOR_RESET)
+		return nil, nil
+	}
+
+	// Compute each indicator using historical close prices
+	sma := SMA(closePrices, 14)
+	ema := EMA(closePrices, 14)
+	stdDev := StandardDeviation(closePrices)
 	lowerBollinger := sma - 2*stdDev
 	upperBollinger := sma + 2*stdDev
-	rsi := indicator.RSI(prices, 14)
-	volatility := (data.High - data.Low) / data.Close
-	macd := indicator.MACD(prices, 12, 26)
-	macdSignal := indicator.MACDSignal(prices, 9)
+	rsi := RSI(closePrices, 14)
+	volatility := (history[len(history)-1].High - history[len(history)-1].Low) / history[len(history)-1].Close
+	macd := MACD(closePrices, 12, 26)
+	macdSignal := MACDSignal(closePrices, 9)
 
 	// Store results in IndicatorDto
 	indicatorDto := &binance.IndicatorDto{
@@ -45,7 +55,7 @@ func (indicator *Indicator) CalculateAllIndicators(data *binance.RecordDto) (*bi
 }
 
 // Simple Moving Average (SMA)
-func (indicator *Indicator) SMA(prices []float64, period int) float64 {
+func SMA(prices []float64, period int) float64 {
 	if len(prices) < period {
 		return 0
 	}
@@ -57,41 +67,33 @@ func (indicator *Indicator) SMA(prices []float64, period int) float64 {
 }
 
 // Exponential Moving Average (EMA)
-func (indicator *Indicator) EMA(prices []float64, period int) float64 {
+func EMA(prices []float64, period int) float64 {
 	if len(prices) < period {
 		return 0
 	}
 	multiplier := 2.0 / (float64(period) + 1.0)
-	ema := prices[0] // Initial EMA value
+	ema := prices[0]
 	for _, price := range prices {
 		ema = (price-ema)*multiplier + ema
 	}
 	return ema
 }
 
-func (indicator *Indicator) Trend(data *binance.RecordDto) float64 {
-	return math.Round((data.Close-data.Open)/data.Open*10000) / 10000
-}
-
 // Standard Deviation
-func (indicator *Indicator) StandardDeviation(prices []float64) float64 {
-	mean := indicator.SMA(prices, len(prices))
-	var sum float64
+func StandardDeviation(prices []float64) float64 {
+	if len(prices) == 0 {
+		return 0
+	}
+	mean := SMA(prices, len(prices))
+	sum := 0.0
 	for _, price := range prices {
 		sum += math.Pow(price-mean, 2)
 	}
 	return math.Sqrt(sum / float64(len(prices)))
 }
 
-// Bollinger Bands
-func (indicator *Indicator) BollingerBands(prices []float64, period int) (float64, float64) {
-	sma := indicator.SMA(prices, period)
-	stddev := indicator.StandardDeviation(prices)
-	return sma - 2*stddev, sma + 2*stddev
-}
-
-// RSI (Relative Strength Index)
-func (indicator *Indicator) RSI(prices []float64, period int) float64 {
+// Relative Strength Index (RSI)
+func RSI(prices []float64, period int) float64 {
 	if len(prices) < period {
 		return 0
 	}
@@ -112,15 +114,21 @@ func (indicator *Indicator) RSI(prices []float64, period int) float64 {
 	rs := avgGain / avgLoss
 	return 100 - (100 / (1 + rs))
 }
-func (indicator *Indicator) MACD(prices []float64, shortPeriod, longPeriod int) float64 {
-	return indicator.EMA(prices, shortPeriod) - indicator.EMA(prices, longPeriod)
+
+// MACD (Moving Average Convergence Divergence)
+func MACD(prices []float64, shortPeriod, longPeriod int) float64 {
+	return EMA(prices, shortPeriod) - EMA(prices, longPeriod)
 }
 
 // MACD Signal Line (9-period EMA of MACD)
-func (indicator *Indicator) MACDSignal(prices []float64, signalPeriod int) float64 {
+func MACDSignal(prices []float64, signalPeriod int) float64 {
 	macdValues := make([]float64, len(prices))
 	for i := range prices {
-		macdValues[i] = indicator.MACD(prices[:i+1], 12, 26)
+		macdValues[i] = MACD(prices[:i+1], 12, 26)
 	}
-	return indicator.EMA(macdValues, signalPeriod)
+	return EMA(macdValues, signalPeriod)
+}
+
+func (indicator *Indicator) Trend(data *binance.RecordDto) float64 {
+	return math.Round((data.Close-data.Open)/data.Open*10000) / 10000
 }

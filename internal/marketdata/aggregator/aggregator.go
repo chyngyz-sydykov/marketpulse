@@ -8,8 +8,8 @@ func NewAggregator() *Aggregator {
 	return &Aggregator{}
 }
 
-func (a *Aggregator) Aggregate(group []binance.RecordDto, timeFrame string) binance.RecordDto {
-	return binance.RecordDto{
+func (a *Aggregator) Aggregate(group []binance.RecordDto, timeFrame string) *binance.RecordDto {
+	return &binance.RecordDto{
 		Timeframe: timeFrame,
 		Symbol:    group[0].Symbol,
 		Timestamp: group[len(group)-1].Timestamp,

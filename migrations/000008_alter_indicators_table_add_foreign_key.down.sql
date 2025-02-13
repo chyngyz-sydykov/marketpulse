@@ -1,0 +1,75 @@
+-- Remove foreign key constraints from indicator tables
+ALTER TABLE indicator_btc_1h
+DROP CONSTRAINT fk_indicator_btc_1h_data_timestamp;
+
+ALTER TABLE indicator_btc_4h
+DROP CONSTRAINT fk_indicator_btc_4h_data_timestamp;
+
+ALTER TABLE indicator_btc_1d
+DROP CONSTRAINT fk_indicator_btc_1d_data_timestamp;
+
+ALTER TABLE indicator_btc_1w
+DROP CONSTRAINT fk_indicator_btc_1w_data_timestamp;
+
+ALTER TABLE indicator_btc_1m
+DROP CONSTRAINT fk_indicator_btc_1m_data_timestamp;
+
+ALTER TABLE indicator_bnb_1h
+DROP CONSTRAINT fk_indicator_bnb_1h_data_timestamp;
+
+ALTER TABLE indicator_bnb_4h
+DROP CONSTRAINT fk_indicator_bnb_4h_data_timestamp;
+
+ALTER TABLE indicator_bnb_1d
+DROP CONSTRAINT fk_indicator_bnb_1d_data_timestamp;
+
+ALTER TABLE indicator_bnb_1w
+DROP CONSTRAINT fk_indicator_bnb_1w_data_timestamp;
+
+ALTER TABLE indicator_bnb_1m
+DROP CONSTRAINT fk_indicator_bnb_1m_data_timestamp;
+
+ALTER TABLE indicator_sol_1h
+DROP CONSTRAINT fk_indicator_sol_1h_data_timestamp;
+
+ALTER TABLE indicator_sol_4h
+DROP CONSTRAINT fk_indicator_sol_4h_data_timestamp;
+
+ALTER TABLE indicator_sol_1d
+DROP CONSTRAINT fk_indicator_sol_1d_data_timestamp;
+
+ALTER TABLE indicator_sol_1w
+DROP CONSTRAINT fk_indicator_sol_1w_data_timestamp;
+
+ALTER TABLE indicator_sol_1m
+DROP CONSTRAINT fk_indicator_sol_1m_data_timestamp;
+
+ALTER TABLE indicator_eth_1h
+DROP CONSTRAINT fk_indicator_eth_1h_data_timestamp;
+
+ALTER TABLE indicator_eth_4h
+DROP CONSTRAINT fk_indicator_eth_4h_data_timestamp;
+
+ALTER TABLE indicator_eth_1d
+DROP CONSTRAINT fk_indicator_eth_1d_data_timestamp;
+
+ALTER TABLE indicator_eth_1w
+DROP CONSTRAINT fk_indicator_eth_1w_data_timestamp;
+
+ALTER TABLE indicator_eth_1m
+DROP CONSTRAINT fk_indicator_eth_1m_data_timestamp;
+
+ALTER TABLE indicator_trump_1h
+DROP CONSTRAINT fk_indicator_trump_1h_data_timestamp;
+
+ALTER TABLE indicator_trump_4h
+DROP CONSTRAINT fk_indicator_trump_4h_data_timestamp;
+
+ALTER TABLE indicator_trump_1d
+DROP CONSTRAINT fk_indicator_trump_1d_data_timestamp;
+
+ALTER TABLE indicator_trump_1w
+DROP CONSTRAINT fk_indicator_trump_1w_data_timestamp;
+
+ALTER TABLE indicator_trump_1m
+DROP CONSTRAINT fk_indicator_trump_1m_data_timestamp;
