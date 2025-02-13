@@ -8,22 +8,18 @@ import (
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
 	aggregator "github.com/chyngyz-sydykov/marketpulse/internal/marketdata/aggregator"
-	indicator "github.com/chyngyz-sydykov/marketpulse/internal/marketdata/indicator"
 )
 
 type MarketDataService struct {
 	repository MarketDataRepository
-	indicator  indicator.Indicator
 	aggregator aggregator.Aggregator
 }
 
 func NewMarketDataService() *MarketDataService {
 	repository := NewMarketDataRepository()
-	indicator := indicator.NewIndicator()
 	aggregator := aggregator.NewAggregator()
 	return &MarketDataService{
 		repository: *repository,
-		indicator:  *indicator,
 		aggregator: *aggregator,
 	}
 }
@@ -68,7 +64,7 @@ func (service *MarketDataService) Store4HourRecords(currency string) error {
 	return nil
 }
 
-func (service *MarketDataService) StoreMarketData(currency string, data *binance.RecordDto) error {
+func (service *MarketDataService) StoreData(currency string, data *binance.RecordDto) error {
 	if !slices.Contains(config.DefaultCurrencies, currency) {
 		return fmt.Errorf("unknown currency: %s", currency)
 	} else {

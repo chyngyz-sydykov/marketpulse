@@ -32,7 +32,24 @@ func StartScheduler() {
 					return
 				}
 
-				err = marketDataService.StoreMarketData(curr, record)
+				err = marketDataService.StoreData(curr, record)
+				if err != nil {
+					log.Printf("Error storing data for %s: %v\n", curr, err)
+					return
+				}
+
+			}(currency)
+		}
+	})
+	scheduler.Every(4).Hour().Do(func() {
+		log.Println("4 hour scheduler...")
+		var wg sync.WaitGroup
+		for _, currency := range config.DefaultCurrencies {
+			wg.Add(1)
+			go func(curr string) {
+
+				defer wg.Done()
+				err := marketDataService.Store4HourRecords(curr)
 				if err != nil {
 					log.Printf("Error storing data for %s: %v\n", curr, err)
 					return
