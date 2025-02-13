@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	_ "github.com/lib/pq"
@@ -30,6 +29,5 @@ func ConnectDB() error {
 	}
 
 	DB = db
-	log.Println("✅ Connected to PostgreSQL!")
 	return nil
 }

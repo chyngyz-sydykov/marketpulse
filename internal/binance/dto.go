@@ -12,6 +12,7 @@ type RecordDto struct {
 	High      float64
 	Low       float64
 	Volume    float64
+	Trend     float64
 }
 
 type IndicatorDto struct {

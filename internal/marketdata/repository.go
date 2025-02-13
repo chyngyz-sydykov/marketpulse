@@ -139,9 +139,9 @@ func (repository *MarketDataRepository) storeData(currency string, data *binance
 			return err
 		}
 
-		query := `INSERT INTO data_` + currency + ` (symbol, timestamp, timeframe, open, high, low, close, volume) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
-		_, err = tx.Exec(query, data.Symbol, data.Timestamp, data.Timeframe, data.Open, data.High, data.Low, data.Close, data.Volume)
+		query := `INSERT INTO data_` + currency + ` (symbol, timestamp, timeframe, open, high, low, close, volume, trend) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+		_, err = tx.Exec(query, data.Symbol, data.Timestamp, data.Timeframe, data.Open, data.High, data.Low, data.Close, data.Volume, data.Trend)
 		if err != nil {
 			tx.Rollback() // Rollback transaction if insert fails
 			log.Println("Error inserting data:", err)
@@ -153,7 +153,7 @@ func (repository *MarketDataRepository) storeData(currency string, data *binance
 			return err
 		}
 
-		log.Println("Market data stored successfully!")
+		log.Println("✅ data stored successfully!")
 		return nil
 	}
 }
@@ -171,22 +171,21 @@ func (repository *MarketDataRepository) storeDataBatch(currency string, records 
 			return err
 		}
 
-		tableName := fmt.Sprintf("data_%s", currency)
-
 		// Construct bulk insert SQL query
-		var placeholders []string
 		var values []interface{}
 
+		var placeholders []string
 		for i, record := range records {
-			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", i*8+1, i*8+2, i*8+3, i*8+4, i*8+5, i*8+6, i*8+7, i*8+8))
-			values = append(values, record.Symbol, record.Timeframe, record.Timestamp, record.Open, record.High, record.Low, record.Close, record.Volume)
+			values = append(values, record.Symbol, record.Timeframe, record.Timestamp, record.Open, record.High, record.Low, record.Close, record.Volume, record.Trend)
+			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", i*9+1, i*9+2, i*9+3, i*9+4, i*9+5, i*9+6, i*9+7, i*9+8, i*9+9))
 		}
 
 		query := fmt.Sprintf(`
-		INSERT INTO %s (symbol, timeframe, timestamp, open, high, low, close, volume) 
-		VALUES %s 
-		`, tableName, strings.Join(placeholders, ", "))
+		INSERT INTO data_%s (symbol, timeframe, timestamp, open, high, low, close, volume, trend) 
+		VALUES %s
+		`, currency, strings.Join(placeholders, ","))
 		_, err = tx.Exec(query, values...)
+
 		if err != nil {
 			tx.Rollback() // Rollback transaction if insert fails
 			log.Println("Error inserting batch:", err)
@@ -198,7 +197,7 @@ func (repository *MarketDataRepository) storeDataBatch(currency string, records 
 			return err
 		}
 
-		log.Println("data batch stored successfully!")
+		log.Println("✅ data batch stored successfully!")
 		return nil
 	}
 }

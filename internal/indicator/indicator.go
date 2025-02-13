@@ -69,6 +69,10 @@ func (indicator *Indicator) EMA(prices []float64, period int) float64 {
 	return ema
 }
 
+func (indicator *Indicator) Trend(data *binance.RecordDto) float64 {
+	return math.Round((data.Close-data.Open)/data.Open*10000) / 10000
+}
+
 // Standard Deviation
 func (indicator *Indicator) StandardDeviation(prices []float64) float64 {
 	mean := indicator.SMA(prices, len(prices))

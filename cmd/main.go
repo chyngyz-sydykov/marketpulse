@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/chyngyz-sydykov/marketpulse/internal/database"
 	"github.com/chyngyz-sydykov/marketpulse/internal/scheduler"
@@ -11,7 +12,7 @@ import (
 func main() {
 	err := database.ConnectDB()
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Fatal("❌ Failed to connect to database:", err)
 	}
 	defer database.DB.Close()
 
@@ -22,7 +23,7 @@ func main() {
 
 	// Prevent main from exiting
 	fmt.Println("MarketPulse is running...")
-	fmt.Println("Salam..")
 	for {
+		time.Sleep(1 * time.Hour)
 	}
 }

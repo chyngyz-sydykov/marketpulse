@@ -50,13 +50,22 @@ func (m *BinanceMockTransport) RoundTrip(req *http.Request) (*http.Response, err
 				"count":              3069555,
 			})
 		} else if strings.Contains(req.URL.Path, "klines") {
+			open := 100 + math.Round(rand.Float64()*100)
+			close := open * (0.5 + rand.Float64()*2)
+			if rand.Float64() < 0.9 {
+				close = open * (0.9 + rand.Float64()*0.2) // 10% higher or lower
+			} else if rand.Float64() < 0.5 {
+				close = open * (0.5 + rand.Float64())
+			}
+			high := math.Max(open, close) * (1.1 + rand.Float64()*0.1)
+			low := math.Min(open, close) * (0.9 + rand.Float64()*0.1)
 			mockBody, _ = json.Marshal([][]interface{}{
 				{
-					time.Now().Add(-1*time.Hour).Unix() * 1000,                 // Kline open time
-					fmt.Sprintf("%.5f", 90000+math.Round(rand.Float64()*1000)), // Open price
-					fmt.Sprintf("%.5f", 91000+math.Round(rand.Float64()*1000)), // High price
-					"90000.11111111", // Low price
-					"92000.11111111", // Close price
+					time.Now().Add(-1*time.Hour).Unix() * 1000,              // Kline open time
+					fmt.Sprintf("%.5f", open),                               // Open price
+					fmt.Sprintf("%.5f", high),                               // High price
+					fmt.Sprintf("%.5f", low),                                // Low price
+					fmt.Sprintf("%.5f", close),                              // Close price
 					fmt.Sprintf("%.5f", 300+math.Round(rand.Float64()*100)), // Volume
 					time.Now().Unix() * 1000,                                // Kline Close time
 					"31371060.16996650",                                     // Quote asset volume

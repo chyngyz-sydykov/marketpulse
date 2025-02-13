@@ -7,20 +7,24 @@ import (
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
+	"github.com/chyngyz-sydykov/marketpulse/internal/indicator"
 	aggregator "github.com/chyngyz-sydykov/marketpulse/internal/marketdata/aggregator"
 )
 
 type MarketDataService struct {
 	repository MarketDataRepository
 	aggregator aggregator.Aggregator
+	indicator  indicator.Indicator
 }
 
 func NewMarketDataService() *MarketDataService {
 	repository := NewMarketDataRepository()
 	aggregator := aggregator.NewAggregator()
+	indicator := indicator.NewIndicator()
 	return &MarketDataService{
 		repository: *repository,
 		aggregator: *aggregator,
+		indicator:  *indicator,
 	}
 }
 
@@ -69,8 +73,9 @@ func (service *MarketDataService) StoreData(currency string, data *binance.Recor
 		return fmt.Errorf("unknown currency: %s", currency)
 	} else {
 		if !slices.Contains(config.DefaultTimeframes, data.Timeframe) {
-			return fmt.Errorf("unknown time frame: %s", data.Timeframe)
+			return fmt.Errorf("unknown timeframe: %s", data.Timeframe)
 		}
+
 		exists, err := service.repository.checkIfRecordExists(currency, data.Timeframe, data.Timestamp)
 		if err != nil {
 			return err
@@ -79,6 +84,9 @@ func (service *MarketDataService) StoreData(currency string, data *binance.Recor
 			fmt.Printf("data already exists for currency: %s, timeframe: %s, timestamp: %s\n", currency, data.Timeframe, data.Timestamp)
 			return nil
 		}
+
+		data.Trend = service.indicator.Trend(data)
+
 		return service.repository.storeData(currency, data)
 	}
 
