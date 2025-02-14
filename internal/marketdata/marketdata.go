@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"sync"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
@@ -53,15 +54,15 @@ func (service *MarketDataService) Store4HourRecords(currency string) error {
 	}
 
 	var aggregatedRecords []*binance.RecordDto
+	var groupedRecords [][]binance.RecordDto
 	for i := 0; i+3 < len(oneHourRecords); i += 4 {
 		group := oneHourRecords[i : i+4]
-		aggregatedRecord := service.aggregator.Aggregate(group, config.FOUR_HOUR)
-		aggregatedRecord.Trend = service.indicator.Trend(aggregatedRecord)
+
+		aggregatedRecord := service.createAggregatedRecord(group, config.FOUR_HOUR)
 		aggregatedRecords = append(aggregatedRecords, aggregatedRecord)
 
-		// calculate indicators for a group of 4 records
-		// save it to indicator table
-		_, _ = service.indicator.CalculateAllIndicators(group)
+		groupedRecords = append(groupedRecords, group)
+
 	}
 
 	// Insert aggregated records into the 4-hour table
@@ -69,7 +70,19 @@ func (service *MarketDataService) Store4HourRecords(currency string) error {
 	if err != nil {
 		return err
 	}
+
+	//calculate indicators for each group of 4 records
+	err = service.calculateAndStoreIndicators(currency, groupedRecords)
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func (service *MarketDataService) createAggregatedRecord(records []binance.RecordDto, timeframe string) *binance.RecordDto {
+	aggregatedRecord := service.aggregator.Aggregate(records, config.FOUR_HOUR)
+	aggregatedRecord.Trend = service.indicator.Trend(aggregatedRecord)
+	return aggregatedRecord
 }
 
 func (service *MarketDataService) StoreData(currency string, data *binance.RecordDto) error {
@@ -94,4 +107,21 @@ func (service *MarketDataService) StoreData(currency string, data *binance.Recor
 		return service.repository.storeData(currency, data)
 	}
 
+}
+
+func (service *MarketDataService) calculateAndStoreIndicators(currency string, groupedRecords [][]binance.RecordDto) error {
+	var wg sync.WaitGroup
+	for i := 0; i < len(groupedRecords); i++ {
+		wg.Add(1)
+		go func(group []binance.RecordDto) {
+			defer wg.Done()
+
+			err := service.indicator.ComputeAndStore(currency, group)
+			if err != nil {
+				log.Printf(config.COLOR_RED+"Error computing indicators for %s: %v"+config.COLOR_RESET, currency, err)
+			}
+		}(groupedRecords[i])
+	}
+	wg.Wait()
+	return nil
 }

@@ -1,103 +1,155 @@
 package indicator
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 	"math"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
+	"github.com/chyngyz-sydykov/marketpulse/internal/utils"
 )
 
 type Indicator struct {
+	repository IndicatorRepository
+	currency   string
 }
 
 func NewIndicator() *Indicator {
-	return &Indicator{}
+	repository := NewIndicatorRepository()
+	return &Indicator{
+		repository: *repository,
+	}
 }
 
-func (indicator *Indicator) CalculateAllIndicators(history []binance.RecordDto) (*binance.IndicatorDto, error) {
-	// Extract close prices from historical data
-	var closePrices []float64
-	for _, record := range history {
-		closePrices = append(closePrices, record.Close)
+func (service *Indicator) ComputeAndStore(currency string, history []binance.RecordDto) error {
+
+	service.currency = currency
+	fmt.Println("💡 Computing indicators...")
+	if len(history) == 0 {
+		log.Printf("%s", config.COLOR_YELLOW+"not enough data to calculate indicators"+config.COLOR_RESET)
+		return nil
+	}
+	indicatorDto := &binance.IndicatorDto{}
+	err := service.setMetadata(indicatorDto, history)
+	if err != nil {
+		return err
+	}
+	exists, err := service.repository.checkIfRecordExistsByTimestampAndTimeframe(currency, indicatorDto)
+	if err != nil {
+		return err
+	}
+	if exists {
+		log.Printf(config.COLOR_YELLOW+"indicator already exists for %s %s %s\n"+config.COLOR_RESET, currency, indicatorDto.Timeframe, indicatorDto.Timestamp)
+		return nil
 	}
 
-	if len(closePrices) == 0 {
-		log.Printf("%s", config.COLOR_YELLOW+"not enough data to calculate indicators"+config.COLOR_RESET)
-		return nil, nil
+	if err != nil {
+		return fmt.Errorf("indicator->setMetadata: %w", err)
+	}
+	err = service.CalculateAllIndicators(history, indicatorDto)
+	if err != nil {
+		return fmt.Errorf("indicator->CalculateAllIndicators: %w", err)
+	}
+
+	err = service.repository.storeData(currency, indicatorDto)
+	if err != nil {
+		return fmt.Errorf("indicator->storeData: %w", err)
+	}
+	return nil
+}
+
+func (service *Indicator) CalculateAllIndicators(history []binance.RecordDto, indicatorDto *binance.IndicatorDto) error {
+	// Extract close prices from historical data
+	var closePrices []float64
+	var highPrices []float64
+	var lowPrices []float64
+	for _, record := range history {
+		closePrices = append(closePrices, record.Close)
+		highPrices = append(highPrices, record.High)
+		lowPrices = append(lowPrices, record.Low)
 	}
 
 	// Compute each indicator using historical close prices
-	sma := SMA(closePrices, 14)
-	ema := EMA(closePrices, 14)
-	stdDev := StandardDeviation(closePrices)
-	lowerBollinger := sma - 2*stdDev
-	upperBollinger := sma + 2*stdDev
-	rsi := RSI(closePrices, 14)
-	volatility := (history[len(history)-1].High - history[len(history)-1].Low) / history[len(history)-1].Close
-	macd := MACD(closePrices, 12, 26)
-	macdSignal := MACDSignal(closePrices, 9)
-
-	// Store results in IndicatorDto
-	indicatorDto := &binance.IndicatorDto{
-		SMA:            sma,
-		EMA:            ema,
-		StdDev:         stdDev,
-		LowerBollinger: lowerBollinger,
-		UpperBollinger: upperBollinger,
-		RSI:            rsi,
-		Volatility:     volatility,
-		MACD:           macd,
-		MACDSignal:     macdSignal,
-	}
-
-	return indicatorDto, nil
+	service.SMA(closePrices, indicatorDto)
+	service.EMA(closePrices, indicatorDto, 4)
+	service.StandardDeviation(closePrices, indicatorDto)
+	service.Bollinger(indicatorDto)
+	service.RSI(closePrices, indicatorDto)
+	service.Volatility(highPrices, lowPrices, closePrices, indicatorDto)
+	// fmt.Println("closePrices: ", closePrices)
+	// fmt.Println("highPrices: ", highPrices)
+	// fmt.Println("lowPrices: ", lowPrices)
+	// fmt.Println("SMA: ", indicatorDto.SMA)
+	// fmt.Println("EMA: ", indicatorDto.EMA)
+	// fmt.Println("StandardDeviation: ", indicatorDto.StdDev)
+	// fmt.Println("lowerBollinger: ", indicatorDto.LowerBollinger)
+	// fmt.Println("upperBollinger: ", indicatorDto.UpperBollinger)
+	// fmt.Println("RSI: ", indicatorDto.RSI)
+	// fmt.Println("Volatility: ", indicatorDto.Volatility)
+	// fmt.Println("DataTimestamp: ", indicatorDto.DataTimestamp)
+	// macdSignal := indicator.MACDSignal(closePrices, 9)
+	return nil
 }
 
-// Simple Moving Average (SMA)
-func SMA(prices []float64, period int) float64 {
-	if len(prices) < period {
-		return 0
+func (service *Indicator) setMetadata(indicatorDto *binance.IndicatorDto, history []binance.RecordDto) error {
+	nextTimeframe := utils.GetNextTimeframe(history[0].Timeframe)
+	if nextTimeframe == "" {
+		return fmt.Errorf("no next timeframe for %s", history[0].Timeframe)
 	}
+
+	lastTimestamp := history[len(history)-1].Timestamp
+	indicatorDto.Timeframe = nextTimeframe
+	indicatorDto.Timestamp = lastTimestamp
+	indicatorDto.DataTimestamp = lastTimestamp
+	return nil
+}
+
+func (service *Indicator) SMA(prices []float64, indicatorDto *binance.IndicatorDto) {
+	period := len(prices)
 	sum := 0.0
-	for _, price := range prices[len(prices)-period:] {
+	for _, price := range prices {
 		sum += price
 	}
-	return sum / float64(period)
+	indicatorDto.SMA = sum / float64(period)
 }
 
 // Exponential Moving Average (EMA)
-func EMA(prices []float64, period int) float64 {
-	if len(prices) < period {
-		return 0
+func (service *Indicator) EMA(prices []float64, indicatorDto *binance.IndicatorDto, period int) {
+	previousIndicator, err := service.repository.getLastRecord(service.currency, config.FOUR_HOUR)
+	if err != nil && err != sql.ErrNoRows {
+		return
 	}
+	previousEma := indicatorDto.SMA
+
+	if previousIndicator != nil {
+		previousEma = previousIndicator.EMA
+	}
+
 	multiplier := 2.0 / (float64(period) + 1.0)
-	ema := prices[0]
-	for _, price := range prices {
-		ema = (price-ema)*multiplier + ema
-	}
-	return ema
+	latestClosePrice := prices[len(prices)-1]
+	indicatorDto.EMA = latestClosePrice*multiplier + previousEma*(1-multiplier)
 }
 
 // Standard Deviation
-func StandardDeviation(prices []float64) float64 {
-	if len(prices) == 0 {
-		return 0
-	}
-	mean := SMA(prices, len(prices))
+func (service *Indicator) StandardDeviation(prices []float64, indicatorDto *binance.IndicatorDto) {
+	mean := indicatorDto.SMA
 	sum := 0.0
 	for _, price := range prices {
 		sum += math.Pow(price-mean, 2)
 	}
-	return math.Sqrt(sum / float64(len(prices)))
+	indicatorDto.StdDev = math.Sqrt(sum / float64(len(prices)))
 }
 
-// Relative Strength Index (RSI)
-func RSI(prices []float64, period int) float64 {
-	if len(prices) < period {
-		return 0
-	}
+func (service *Indicator) Bollinger(indicatorDto *binance.IndicatorDto) {
+	indicatorDto.LowerBollinger = indicatorDto.SMA - 2*indicatorDto.StdDev
+	indicatorDto.UpperBollinger = indicatorDto.SMA + 2*indicatorDto.StdDev
+}
+
+func (service *Indicator) RSI(prices []float64, indicatorDto *binance.IndicatorDto) {
 	gain, loss := 0.0, 0.0
+	period := len(prices)
 	for i := 1; i < period; i++ {
 		change := prices[i] - prices[i-1]
 		if change > 0 {
@@ -109,26 +161,29 @@ func RSI(prices []float64, period int) float64 {
 	avgGain := gain / float64(period)
 	avgLoss := loss / float64(period)
 	if avgLoss == 0 {
-		return 100
+		indicatorDto.RSI = 100
 	}
 	rs := avgGain / avgLoss
-	return 100 - (100 / (1 + rs))
+	indicatorDto.RSI = 100 - (100 / (1 + rs))
 }
 
-// MACD (Moving Average Convergence Divergence)
-func MACD(prices []float64, shortPeriod, longPeriod int) float64 {
-	return EMA(prices, shortPeriod) - EMA(prices, longPeriod)
-}
+// // MACD (Moving Average Convergence Divergence)
+// func (service *Indicator) MACD(prices []float64, shortPeriod, longPeriod int) float64 {
+// 	return indicator.EMA(prices, shortPeriod) - indicator.EMA(prices, longPeriod)
+// }
 
-// MACD Signal Line (9-period EMA of MACD)
-func MACDSignal(prices []float64, signalPeriod int) float64 {
-	macdValues := make([]float64, len(prices))
-	for i := range prices {
-		macdValues[i] = MACD(prices[:i+1], 12, 26)
-	}
-	return EMA(macdValues, signalPeriod)
-}
+// // MACD Signal Line (9-period EMA of MACD)
+// func (service *Indicator) MACDSignal(prices []float64, signalPeriod int) float64 {
+// 	macdValues := make([]float64, len(prices))
+// 	for i := range prices {
+// 		macdValues[i] = indicator.MACD(prices[:i+1], 12, 26)
+// 	}
+// 	return indicator.EMA(macdValues, signalPeriod)
+// }
 
-func (indicator *Indicator) Trend(data *binance.RecordDto) float64 {
+func (service *Indicator) Trend(data *binance.RecordDto) float64 {
 	return math.Round((data.Close-data.Open)/data.Open*10000) / 10000
+}
+func (service *Indicator) Volatility(highPrices []float64, lowPrices []float64, closePrices []float64, indicatorDto *binance.IndicatorDto) {
+	indicatorDto.Volatility = (highPrices[len(highPrices)-1] - lowPrices[len(lowPrices)-1]) / closePrices[len(highPrices)-1]
 }

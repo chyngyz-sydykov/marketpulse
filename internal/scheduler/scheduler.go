@@ -34,7 +34,7 @@ func StartScheduler() {
 
 				err = marketDataService.StoreData(curr, record)
 				if err != nil {
-					log.Printf("Error storing data for %s: %v\n", curr, err)
+					log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
 					return
 				}
 
@@ -51,7 +51,7 @@ func StartScheduler() {
 				defer wg.Done()
 				err := marketDataService.Store4HourRecords(curr)
 				if err != nil {
-					log.Printf("Error storing data for %s: %v\n", curr, err)
+					log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
 					return
 				}
 

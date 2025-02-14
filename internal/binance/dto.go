@@ -17,6 +17,9 @@ type RecordDto struct {
 
 type IndicatorDto struct {
 	Id             *int
+	Timeframe      string
+	Timestamp      time.Time
+	DataTimestamp  time.Time
 	SMA            float64
 	EMA            float64
 	StdDev         float64
