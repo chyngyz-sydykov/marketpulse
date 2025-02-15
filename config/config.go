@@ -43,6 +43,9 @@ type Config struct {
 	DBPassword        string
 	MockBinance       bool
 	BinanceBaseAPIUrl string
+	RedisHost         string
+	RedisPort         string
+	RedisPassword     string
 }
 
 // LoadConfig reads from .env and loads it into Config struct
@@ -60,6 +63,9 @@ func LoadConfig() *Config {
 		DBPassword:        getEnv("DB_PASSWORD", "password"),
 		MockBinance:       os.Getenv("MOCK_BINANCE") == "true",
 		BinanceBaseAPIUrl: getEnv("BINANCE_BASE_API_URL", "https://api.binance.com/api/v3/"),
+		RedisHost:         getEnv("REDIS_HOST", "localhost"),
+		RedisPort:         getEnv("REDIS_PORT", "6379"),
+		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
 	}
 }
 

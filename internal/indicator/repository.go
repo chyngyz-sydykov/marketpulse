@@ -26,7 +26,7 @@ func (repository *IndicatorRepository) checkIfRecordExistsByTimestampAndTimefram
 		if err == sql.ErrNoRows {
 			return false, nil // Record doesn't exist
 		}
-		log.Printf("Error checking record existence: %v", err)
+		log.Printf("💾 Error checking record existence: %v", err)
 		return false, err
 	}
 
@@ -45,19 +45,20 @@ func (repository *IndicatorRepository) getLastRecord(currency, timeframe string)
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("error fetching data: %v", err)
+		return nil, fmt.Errorf("💾 error fetching data: %v", err)
 	}
 
 	return &record, nil
 }
 
 func (repository *IndicatorRepository) storeData(currency string, data *binance.IndicatorDto) error {
+	//TODO should this be here?
 	if !slices.Contains(config.DefaultCurrencies, currency) {
 		return fmt.Errorf("unknown currency: %s", currency)
 	} else {
 		tx, err := database.DB.Begin()
 		if err != nil {
-			log.Println("Error starting transaction:", err)
+			log.Println("💾 Error starting transaction:", err)
 			return err
 		}
 
@@ -67,16 +68,16 @@ func (repository *IndicatorRepository) storeData(currency string, data *binance.
 
 		if err != nil {
 			tx.Rollback() // Rollback transaction if insert fails
-			log.Println("Error inserting indicator:", err)
+			log.Println("💾 Error inserting indicator:", err)
 			return err
 		}
 		err = tx.Commit() // Commit transaction
 		if err != nil {
-			log.Println("Error committing transaction:", err)
+			log.Println("💾 Error committing transaction:", err)
 			return err
 		}
 
-		log.Println("✅ indicator stored successfully!")
+		log.Println("💾 ✅ indicator stored successfully!")
 		return nil
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
 	"github.com/chyngyz-sydykov/marketpulse/internal/database"
 	"github.com/chyngyz-sydykov/marketpulse/internal/marketdata"
-	"github.com/chyngyz-sydykov/marketpulse/internal/scheduler"
+	"github.com/chyngyz-sydykov/marketpulse/internal/redis"
 )
 
 func main() {
@@ -22,9 +22,15 @@ func main() {
 	}
 	defer database.DB.Close()
 
+	err = redis.ConnectRedis()
+	if err != nil {
+		log.Fatal("❌ Failed to connect to redis:", err)
+	}
+	defer redis.Redis.Close()
+
 	//getAlotOfData()
 	// Start the scheduler to fetch market data every hour
-	scheduler.StartScheduler()
+	//scheduler.StartScheduler()
 	// in := indicator.NewIndicator()
 
 	// get data from binance every hour

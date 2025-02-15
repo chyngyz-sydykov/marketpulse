@@ -12,6 +12,7 @@ services:
       - ROOT_DIR=/app
     depends_on:
       - db
+      - redis
     networks:
       default:
   db:
@@ -39,6 +40,17 @@ services:
       timeout: 5s
     networks:
       default:
+  redis:
+    image: redis:latest
+    restart: always
+    container_name: marketpulse_redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      default:
   # rabbitmq:
   #   image: rabbitmq:4-management
   #   container_name: go_web_rabbitmq
@@ -55,9 +67,5 @@ services:
 
 volumes:
   db-data:
+  redis-data:
   # rabbitmq-data:
-
-# networks:
-#   default:
-#       name: grpc-network
-#       external: true

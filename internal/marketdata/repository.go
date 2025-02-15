@@ -26,7 +26,7 @@ func (repository *MarketDataRepository) getRecords(currency string, timeframe st
 
 	rows, err := database.DB.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching data: %v", err)
+		return nil, fmt.Errorf("💾 error fetching data: %v", err)
 	}
 	defer rows.Close()
 
@@ -36,13 +36,13 @@ func (repository *MarketDataRepository) getRecords(currency string, timeframe st
 		err := rows.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp,
 			&record.Open, &record.High, &record.Low, &record.Close, &record.Volume)
 		if err != nil {
-			return nil, fmt.Errorf("error scanning row: %v", err)
+			return nil, fmt.Errorf("💾 error scanning row: %v", err)
 		}
 		records = append(records, record)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating rows: %v", err)
+		return nil, fmt.Errorf("💾 error iterating rows: %v", err)
 	}
 
 	return records, nil
@@ -53,7 +53,7 @@ func (repository *MarketDataRepository) getRecordsAfter(currency string, timefra
 
 	rows, err := database.DB.Query(query, lastTime)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching data: %v", err)
+		return nil, fmt.Errorf("💾 error fetching data: %v", err)
 	}
 	defer rows.Close()
 
@@ -63,13 +63,13 @@ func (repository *MarketDataRepository) getRecordsAfter(currency string, timefra
 		err := rows.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp,
 			&record.Open, &record.High, &record.Low, &record.Close, &record.Volume)
 		if err != nil {
-			return nil, fmt.Errorf("error scanning row: %v", err)
+			return nil, fmt.Errorf("💾 error scanning row: %v", err)
 		}
 		records = append(records, record)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating rows: %v", err)
+		return nil, fmt.Errorf("💾 error iterating rows: %v", err)
 	}
 
 	return records, nil
@@ -89,7 +89,7 @@ func (repository *MarketDataRepository) getLastRecord(currency, timeframe string
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("error fetching data: %v", err)
+		return nil, fmt.Errorf("💾 error fetching data: %v", err)
 	}
 
 	return &record, nil
@@ -103,7 +103,7 @@ func (repository *MarketDataRepository) checkIfRecordExists(currency, timeframe 
 		if err == sql.ErrNoRows {
 			return false, nil // Record doesn't exist
 		}
-		log.Printf("Error checking record existence: %v", err)
+		log.Printf("💾 error checking record existence: %v", err)
 		return false, err
 	}
 
@@ -122,9 +122,9 @@ func (repository *MarketDataRepository) getDataByTimeFrameAndTimestamp(currency 
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("no data found for %s %s at %s", currency, timeframe, dateTime)
+			return nil, fmt.Errorf("💾 no data found for %s %s at %s", currency, timeframe, dateTime)
 		}
-		return nil, fmt.Errorf("error fetching data: %v", err)
+		return nil, fmt.Errorf("💾 error fetching data: %v", err)
 	}
 
 	return []binance.RecordDto{record}, nil
@@ -186,16 +186,16 @@ func (repository *MarketDataRepository) storeDataBatchByTimeFrame(currency strin
 
 		if err != nil {
 			tx.Rollback() // Rollback transaction if insert fails
-			log.Println("Error inserting batch:", err)
+			log.Println("💾 Error inserting batch:", err)
 			return err
 		}
 		err = tx.Commit() // Commit transaction
 		if err != nil {
-			log.Println("Error committing transaction:", err)
+			log.Println("💾 Error committing transaction:", err)
 			return err
 		}
 
-		log.Println("✅ data batch stored successfully!")
+		log.Println("💾 ✅ data batch stored successfully!")
 		return nil
 	}
 }
