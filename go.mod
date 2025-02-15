@@ -3,6 +3,7 @@ module github.com/chyngyz-sydykov/marketpulse
 go 1.23.2
 
 require (
+	github.com/Jeffail/tunny v0.1.4 // indirect
 	github.com/go-co-op/gocron v1.37.0 // indirect
 	github.com/google/uuid v1.4.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect

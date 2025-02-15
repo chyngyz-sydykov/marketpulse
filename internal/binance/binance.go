@@ -56,11 +56,11 @@ func FetchTicker(currency string) (*RecordDto, error) {
 }
 
 // FetchMarketData retrieves data from Binance API
-func FetchKline(currency string) (*RecordDto, error) {
+func FetchKline(currency string, interval string, limit int) ([]*RecordDto, error) {
 
 	cfg := config.LoadConfig()
 	client := GetHTTPClient()
-	req, err := http.NewRequest("GET", cfg.BinanceBaseAPIUrl+"klines?interval=1h&limit=1&symbol="+strings.ToUpper(currency)+"USDT", nil)
+	req, err := http.NewRequest("GET", cfg.BinanceBaseAPIUrl+"klines?interval="+interval+"&limit="+strconv.Itoa(limit)+"&symbol="+strings.ToUpper(currency)+"USDT", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,6 @@ func FetchKline(currency string) (*RecordDto, error) {
 	}
 
 	body, err := io.ReadAll(resp.Body)
-	//fmt.Println("body:", string(body))
 	if err != nil {
 		return nil, err
 	}
@@ -89,17 +88,22 @@ func FetchKline(currency string) (*RecordDto, error) {
 		return nil, fmt.Errorf("unexpected response format")
 	}
 
-	firstElement := binanceKlineData[0]
-	return &RecordDto{
-		Symbol:    strings.ToUpper(currency) + "USDT",
-		Timestamp: time.Unix(int64(firstElement[0].(float64))/1000, 0).Truncate(time.Hour), // Kline open time with precision to hour
-		Timeframe: config.ONE_HOUR,
-		Open:      parseFloat(firstElement[1].(string)), // Open price
-		High:      parseFloat(firstElement[2].(string)), // High price
-		Low:       parseFloat(firstElement[3].(string)), // Low price
-		Close:     parseFloat(firstElement[4].(string)), // Close price
-		Volume:    parseFloat(firstElement[5].(string)), // Volume
-	}, nil
+	records := make([]*RecordDto, 0, len(binanceKlineData))
+
+	for i := 0; i < len(binanceKlineData); i++ {
+		element := binanceKlineData[i]
+		records = append(records, &RecordDto{
+			Symbol:    strings.ToUpper(currency) + "USDT",
+			Timestamp: time.Unix(int64(element[0].(float64))/1000, 0).Truncate(time.Hour), // Kline open time with precision to hour
+			Timeframe: config.ONE_HOUR,
+			Open:      parseFloat(element[1].(string)), // Open price
+			High:      parseFloat(element[2].(string)), // High price
+			Low:       parseFloat(element[3].(string)), // Low price
+			Close:     parseFloat(element[4].(string)), // Close price
+			Volume:    parseFloat(element[5].(string)), // Volume
+		})
+	}
+	return records, nil
 }
 func parseFloat(value string) float64 {
 	parsed, err := strconv.ParseFloat(value, 64)

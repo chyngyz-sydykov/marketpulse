@@ -158,10 +158,8 @@ func (repository *MarketDataRepository) storeData(currency string, data *binance
 	}
 }
 
-func (repository *MarketDataRepository) storeDataBatch(currency string, records []*binance.RecordDto) error {
-	if !slices.Contains(config.DefaultCurrencies, currency) {
-		return fmt.Errorf("unknown currency: %s", currency)
-	} else if len(records) == 0 {
+func (repository *MarketDataRepository) storeDataBatchByTimeFrame(currency string, timeFrame string, records []*binance.RecordDto) error {
+	if len(records) == 0 {
 		return nil
 	} else {
 
@@ -176,14 +174,14 @@ func (repository *MarketDataRepository) storeDataBatch(currency string, records 
 
 		var placeholders []string
 		for i, record := range records {
-			values = append(values, record.Symbol, record.Timeframe, record.Timestamp, record.Open, record.High, record.Low, record.Close, record.Volume, record.Trend)
 			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", i*9+1, i*9+2, i*9+3, i*9+4, i*9+5, i*9+6, i*9+7, i*9+8, i*9+9))
+			values = append(values, record.Symbol, record.Timeframe, record.Timestamp, record.Open, record.High, record.Low, record.Close, record.Volume, record.Trend)
 		}
 
 		query := fmt.Sprintf(`
-		INSERT INTO data_%s (symbol, timeframe, timestamp, open, high, low, close, volume, trend) 
+		INSERT INTO data_%s_%s (symbol, timeframe, timestamp, open, high, low, close, volume, trend) 
 		VALUES %s
-		`, currency, strings.Join(placeholders, ","))
+		ON CONFLICT (timestamp) DO NOTHING;`, currency, timeFrame, strings.Join(placeholders, ","))
 		_, err = tx.Exec(query, values...)
 
 		if err != nil {

@@ -10,6 +10,13 @@ import (
 // var DefaultCurrencies = []string{"btc", "eth", "bnb", "sol", "trump"}
 var DefaultCurrencies = []string{"btc"}
 var DefaultTimeframes = []string{"1h", "4h", "1d", "1w", "1m"}
+var HoursByTimeframe = map[string]int{
+	"1h": 1,
+	"4h": 4,
+	"1d": 24,
+	"1w": 168,
+	"1m": 30 * 24, // TODO assuming 1 month is 30 days
+}
 var ONE_HOUR = "1h"
 var FOUR_HOUR = "4h"
 var ONE_DAY = "1d"

@@ -29,50 +29,42 @@ func NewMarketDataService() *MarketDataService {
 	}
 }
 
-func (service *MarketDataService) Store4HourRecords(currency string) error {
+func (service *MarketDataService) StoreGroupedRecords(currency string, groupingTimeframe string) error {
 
-	last4HourRecord, err := service.repository.getLastRecord(currency, config.FOUR_HOUR)
+	lastGroupRecord, err := service.repository.getLastRecord(currency, groupingTimeframe)
 	if err != nil {
 		return err
 	}
 	var oneHourRecords []binance.RecordDto
+	hoursInGroup := config.HoursByTimeframe[groupingTimeframe]
 
-	if last4HourRecord == nil {
+	if lastGroupRecord == nil {
 		// No previous 4-hour record → Fetch all 1-hour records
 		oneHourRecords, err = service.repository.getRecords(currency, config.ONE_HOUR) // Get all
 	} else {
 		// Fetch only 1-hour records after the last 4-hour timestamp
-		oneHourRecords, err = service.repository.getRecordsAfter(currency, config.ONE_HOUR, last4HourRecord.Timestamp)
+		oneHourRecords, err = service.repository.getRecordsAfter(currency, config.ONE_HOUR, lastGroupRecord.Timestamp)
 	}
 	if err != nil {
 		return err
 	}
 
-	if len(oneHourRecords) < 4 {
-		log.Printf(config.COLOR_YELLOW+"not enough 1-hour records for %s to create a 4-hour record"+config.COLOR_RESET, currency)
+	if len(oneHourRecords) < hoursInGroup {
+		log.Printf(config.COLOR_YELLOW+"not enough %s records for %s to create a %s record"+config.COLOR_RESET, config.ONE_HOUR, groupingTimeframe, currency)
 		return nil
 	}
 
 	var aggregatedRecords []*binance.RecordDto
-	var groupedRecords [][]binance.RecordDto
-	for i := 0; i+3 < len(oneHourRecords); i += 4 {
-		group := oneHourRecords[i : i+4]
+	for i := 0; i+hoursInGroup-1 < len(oneHourRecords); i += hoursInGroup {
+		group := oneHourRecords[i : i+hoursInGroup]
 
-		aggregatedRecord := service.createAggregatedRecord(group, config.FOUR_HOUR)
+		aggregatedRecord := service.createAggregatedRecord(group, groupingTimeframe)
 		aggregatedRecords = append(aggregatedRecords, aggregatedRecord)
-
-		groupedRecords = append(groupedRecords, group)
 
 	}
 
 	// Insert aggregated records into the 4-hour table
-	err = service.repository.storeDataBatch(currency, aggregatedRecords)
-	if err != nil {
-		return err
-	}
-
-	//calculate indicators for each group of 4 records
-	err = service.calculateAndStoreIndicators(currency, groupedRecords)
+	err = service.repository.storeDataBatchByTimeFrame(currency, aggregatedRecords[0].Timeframe, aggregatedRecords)
 	if err != nil {
 		return err
 	}
@@ -80,9 +72,26 @@ func (service *MarketDataService) Store4HourRecords(currency string) error {
 }
 
 func (service *MarketDataService) createAggregatedRecord(records []binance.RecordDto, timeframe string) *binance.RecordDto {
-	aggregatedRecord := service.aggregator.Aggregate(records, config.FOUR_HOUR)
+	aggregatedRecord := service.aggregator.Aggregate(records, timeframe)
 	aggregatedRecord.Trend = service.indicator.Trend(aggregatedRecord)
 	return aggregatedRecord
+}
+
+func (service *MarketDataService) StoreBatchData(currency string, data []*binance.RecordDto) error {
+	if !slices.Contains(config.DefaultCurrencies, currency) {
+		return fmt.Errorf("unknown currency: %s", currency)
+	} else {
+		timeFrame := data[0].Timeframe
+		if !slices.Contains(config.DefaultTimeframes, timeFrame) {
+			return fmt.Errorf("unknown timeframe: %s", timeFrame)
+		}
+
+		for _, record := range data {
+			record.Trend = service.indicator.Trend(record)
+		}
+		return service.repository.storeDataBatchByTimeFrame(currency, timeFrame, data)
+	}
+
 }
 
 func (service *MarketDataService) StoreData(currency string, data *binance.RecordDto) error {

@@ -12,3 +12,12 @@ func GetNextTimeframe(timeframe string) string {
 	}
 	return ""
 }
+
+func GetPreviousTimeframe(timeframe string) string {
+	for i, tf := range config.DefaultTimeframes {
+		if tf == timeframe && i > 0 {
+			return config.DefaultTimeframes[i-1]
+		}
+	}
+	return ""
+}
