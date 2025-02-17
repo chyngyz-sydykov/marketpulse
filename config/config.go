@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -50,8 +50,10 @@ type Config struct {
 
 // LoadConfig reads from .env and loads it into Config struct
 func LoadConfig() *Config {
-	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: No .env file found, using environment variables")
+
+	err := loadEnvFile()
+	if err != nil {
+		fmt.Println("error loading env file:", err)
 	}
 
 	return &Config{
@@ -75,4 +77,16 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func loadEnvFile() error {
+	rootDir := os.Getenv("ROOT_DIR")
+	envFileName := rootDir + "/.env"
+
+	if os.Getenv("APP_ENV") != "development" {
+		envFileName = rootDir + "/.env." + os.Getenv("APP_ENV")
+	}
+
+	err := godotenv.Load(envFileName)
+	return err
 }

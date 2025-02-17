@@ -20,7 +20,7 @@ func NewMarketDataRepository() *MarketDataRepository {
 	return &MarketDataRepository{}
 }
 
-func (repository *MarketDataRepository) getRecords(currency string, timeframe string) ([]binance.RecordDto, error) {
+func (repository *MarketDataRepository) getRecordsWithTimeModulo(currency string, timeframe string, mode int) ([]binance.RecordDto, error) {
 	query := fmt.Sprintf(`SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume 
 						  FROM data_%s_%s ORDER BY timestamp ASC`, currency, timeframe)
 
@@ -31,6 +31,8 @@ func (repository *MarketDataRepository) getRecords(currency string, timeframe st
 	defer rows.Close()
 
 	var records []binance.RecordDto
+	firstValidRecordFound := false
+
 	for rows.Next() {
 		var record binance.RecordDto
 		err := rows.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp,
@@ -38,6 +40,14 @@ func (repository *MarketDataRepository) getRecords(currency string, timeframe st
 		if err != nil {
 			return nil, fmt.Errorf("💾 error scanning row: %v", err)
 		}
+		if !firstValidRecordFound {
+			if record.Timestamp.Hour()%mode == 0 {
+				firstValidRecordFound = true
+			} else {
+				continue // Ignore this record and move to the next
+			}
+		}
+
 		records = append(records, record)
 	}
 
@@ -47,9 +57,12 @@ func (repository *MarketDataRepository) getRecords(currency string, timeframe st
 
 	return records, nil
 }
-func (repository *MarketDataRepository) getRecordsAfter(currency string, timeframe string, lastTime time.Time) ([]binance.RecordDto, error) {
+
+func (repository *MarketDataRepository) getCompleteRecordsAfter(currency string, timeframe string, lastTime time.Time) ([]binance.RecordDto, error) {
 	query := fmt.Sprintf(`SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume 
-						  FROM data_%s_%s WHERE timestamp > $1 ORDER BY timestamp ASC`, currency, timeframe)
+						  FROM data_%s_%s 
+						  WHERE timestamp > $1 and is_complete = true
+						  ORDER BY timestamp ASC`, currency, timeframe)
 
 	rows, err := database.DB.Query(query, lastTime)
 	if err != nil {
@@ -58,6 +71,7 @@ func (repository *MarketDataRepository) getRecordsAfter(currency string, timefra
 	defer rows.Close()
 
 	var records []binance.RecordDto
+
 	for rows.Next() {
 		var record binance.RecordDto
 		err := rows.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp,
@@ -75,9 +89,11 @@ func (repository *MarketDataRepository) getRecordsAfter(currency string, timefra
 	return records, nil
 }
 
-func (repository *MarketDataRepository) getLastRecord(currency, timeframe string) (*binance.RecordDto, error) {
+func (repository *MarketDataRepository) getLastCompleteRecord(currency, timeframe string) (*binance.RecordDto, error) {
 	query := fmt.Sprintf(`SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume 
-						  FROM data_%s_%s ORDER BY timestamp DESC LIMIT 1`, currency, timeframe)
+						  FROM data_%s_%s 
+						  WHERE is_complete = true
+						  ORDER BY timestamp DESC LIMIT 1`, currency, timeframe)
 
 	row := database.DB.QueryRow(query)
 
@@ -103,54 +119,66 @@ func (repository *MarketDataRepository) checkIfRecordExists(currency, timeframe 
 		if err == sql.ErrNoRows {
 			return false, nil // Record doesn't exist
 		}
-		log.Printf("💾 error checking record existence: %v", err)
-		return false, err
+		return false, fmt.Errorf("💾 error checking record existence: %v", err)
 	}
 
 	return exists, nil
 }
 
-func (repository *MarketDataRepository) getDataByTimeFrameAndTimestamp(currency string, timeframe string, dateTime time.Time) ([]binance.RecordDto, error) {
-	query := `SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume 
-			  FROM data_` + currency + `_` + timeframe + ` WHERE timestamp=$1`
-
-	row := database.DB.QueryRow(query, dateTime)
-
-	var record binance.RecordDto
-	err := row.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp,
-		&record.Open, &record.High, &record.Low, &record.Close, &record.Volume)
-
+func (repository *MarketDataRepository) upsert(currency string, data *binance.RecordDto) error {
+	tx, err := database.DB.Begin()
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("💾 no data found for %s %s at %s", currency, timeframe, dateTime)
-		}
-		return nil, fmt.Errorf("💾 error fetching data: %v", err)
+		return fmt.Errorf("💾 error starting transaction: %v", err)
+	}
+	query := fmt.Sprintf(
+		`INSERT INTO data_%s_%s (symbol, timestamp, timeframe, open, high, low, close, volume, trend, is_complete) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (timestamp) 
+		DO UPDATE 
+		SET symbol = EXCLUDED.symbol, 
+		timeframe = EXCLUDED.timeframe, 
+		open = EXCLUDED.open, 
+		high = EXCLUDED.high, 
+		low = EXCLUDED.low, 
+		close = EXCLUDED.close, 
+		volume = EXCLUDED.volume, 
+		trend = EXCLUDED.trend, 
+		is_complete = EXCLUDED.is_complete`, currency, data.Timeframe)
+
+	_, err = tx.Exec(query, data.Symbol, data.Timestamp, data.Timeframe, data.Open, data.High, data.Low, data.Close, data.Volume, data.Trend, data.IsComplete)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("💾 error upserting data: %v", err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("💾 error committing transaction: %v", err)
 	}
 
-	return []binance.RecordDto{record}, nil
+	log.Println("✅ data upserted successfully!")
+	return nil
+
 }
-func (repository *MarketDataRepository) storeData(currency string, data *binance.RecordDto) error {
+func (repository *MarketDataRepository) store(currency string, data *binance.RecordDto) error {
+	// TODO do i need this check?
 	if !slices.Contains(config.DefaultCurrencies, currency) {
 		return fmt.Errorf("unknown currency: %s", currency)
 	} else {
 		tx, err := database.DB.Begin()
 		if err != nil {
-			log.Println("Error starting transaction:", err)
-			return err
+			return fmt.Errorf("💾 error starting transaction: %v", err)
 		}
 
-		query := `INSERT INTO data_` + currency + ` (symbol, timestamp, timeframe, open, high, low, close, volume, trend) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
-		_, err = tx.Exec(query, data.Symbol, data.Timestamp, data.Timeframe, data.Open, data.High, data.Low, data.Close, data.Volume, data.Trend)
+		query := `INSERT INTO data_` + currency + ` (symbol, timestamp, timeframe, open, high, low, close, volume, trend, is_complete) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+		_, err = tx.Exec(query, data.Symbol, data.Timestamp, data.Timeframe, data.Open, data.High, data.Low, data.Close, data.Volume, data.Trend, data.IsComplete)
 		if err != nil {
-			tx.Rollback() // Rollback transaction if insert fails
-			log.Println("Error inserting data:", err)
-			return err
+			tx.Rollback()
+			return fmt.Errorf("💾 error inserting data: %v", err)
 		}
-		err = tx.Commit() // Commit transaction
+		err = tx.Commit()
 		if err != nil {
-			log.Println("Error committing transaction:", err)
-			return err
+			return fmt.Errorf("💾 error committing transaction: %v", err)
 		}
 
 		log.Println("✅ data stored successfully!")
@@ -158,44 +186,52 @@ func (repository *MarketDataRepository) storeData(currency string, data *binance
 	}
 }
 
-func (repository *MarketDataRepository) storeDataBatchByTimeFrame(currency string, timeFrame string, records []*binance.RecordDto) error {
+func (repository *MarketDataRepository) upsertBatchByTimeFrame(currency string, timeFrame string, records []*binance.RecordDto) error {
 	if len(records) == 0 {
 		return nil
-	} else {
-
-		tx, err := database.DB.Begin()
-		if err != nil {
-			log.Println("Error starting transaction:", err)
-			return err
-		}
-
-		// Construct bulk insert SQL query
-		var values []interface{}
-
-		var placeholders []string
-		for i, record := range records {
-			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", i*9+1, i*9+2, i*9+3, i*9+4, i*9+5, i*9+6, i*9+7, i*9+8, i*9+9))
-			values = append(values, record.Symbol, record.Timeframe, record.Timestamp, record.Open, record.High, record.Low, record.Close, record.Volume, record.Trend)
-		}
-
-		query := fmt.Sprintf(`
-		INSERT INTO data_%s_%s (symbol, timeframe, timestamp, open, high, low, close, volume, trend) 
-		VALUES %s
-		ON CONFLICT (timestamp) DO NOTHING;`, currency, timeFrame, strings.Join(placeholders, ","))
-		_, err = tx.Exec(query, values...)
-
-		if err != nil {
-			tx.Rollback() // Rollback transaction if insert fails
-			log.Println("💾 Error inserting batch:", err)
-			return err
-		}
-		err = tx.Commit() // Commit transaction
-		if err != nil {
-			log.Println("💾 Error committing transaction:", err)
-			return err
-		}
-
-		log.Println("💾 ✅ data batch stored successfully!")
-		return nil
 	}
+
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("💾 error starting transaction: %v", err)
+	}
+
+	// Construct bulk UPSERT SQL query
+	var values []interface{}
+	var placeholders []string
+
+	for i, record := range records {
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			i*10+1, i*10+2, i*10+3, i*10+4, i*10+5, i*10+6, i*10+7, i*10+8, i*10+9, i*10+10))
+		values = append(values, record.Symbol, record.Timeframe, record.Timestamp,
+			record.Open, record.High, record.Low, record.Close, record.Volume, record.Trend, record.IsComplete)
+	}
+
+	query := fmt.Sprintf(`
+		INSERT INTO data_%s_%s (symbol, timeframe, timestamp, open, high, low, close, volume, trend, is_complete) 
+		VALUES %s
+		ON CONFLICT (timestamp) DO UPDATE 
+		SET open = EXCLUDED.open,
+			high = EXCLUDED.high,
+			low = EXCLUDED.low,
+			close = EXCLUDED.close,
+			volume = EXCLUDED.volume,
+			trend = EXCLUDED.trend,
+			is_complete = EXCLUDED.is_complete;`,
+		currency, timeFrame, strings.Join(placeholders, ","))
+
+	_, err = tx.Exec(query, values...)
+
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("💾 error batch upsert: %v", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("💾 error committing transaction: %v", err)
+	}
+
+	log.Println("💾 ✅ upsert batch successfully!")
+	return nil
 }

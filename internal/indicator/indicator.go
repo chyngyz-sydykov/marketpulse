@@ -22,6 +22,9 @@ func NewIndicator() *Indicator {
 		repository: *repository,
 	}
 }
+func (service *Indicator) ComputeAndStoreByTimeframe(currency string, groupingTimeframe string) error {
+	return nil
+}
 
 func (service *Indicator) ComputeAndStore(currency string, history []binance.RecordDto) error {
 

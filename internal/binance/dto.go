@@ -3,16 +3,17 @@ package binance
 import "time"
 
 type RecordDto struct {
-	Id        *int
-	Symbol    string
-	Timeframe string
-	Timestamp time.Time
-	Open      float64
-	Close     float64
-	High      float64
-	Low       float64
-	Volume    float64
-	Trend     float64
+	Id         *int
+	Symbol     string
+	Timeframe  string
+	Timestamp  time.Time
+	Open       float64
+	Close      float64
+	High       float64
+	Low        float64
+	Volume     float64
+	Trend      float64
+	IsComplete bool
 }
 
 type IndicatorDto struct {

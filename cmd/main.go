@@ -31,8 +31,23 @@ func main() {
 	//getAlotOfData()
 	// Start the scheduler to fetch market data every hour
 	//scheduler.StartScheduler()
-	// in := indicator.NewIndicator()
+	//in := indicator.NewIndicator()
+	marketdataService := marketdata.NewMarketDataService()
+	var wg sync.WaitGroup
+	for _, currency := range config.DefaultCurrencies {
+		wg.Add(1)
+		go func(curr string) {
 
+			defer wg.Done()
+			err := marketdataService.StoreGroupedRecords(curr, config.FOUR_HOUR)
+			if err != nil {
+				log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
+				return
+			}
+
+		}(currency)
+	}
+	wg.Wait()
 	// get data from binance every hour
 	// save 1h data to db
 	// save 4h data and indicators to db if 4h passed
@@ -56,13 +71,13 @@ func getAlotOfData() {
 
 			defer wg.Done()
 
-			records, err := binance.FetchKline(curr, config.ONE_HOUR, 1000)
+			records, err := binance.FetchKline(curr, config.ONE_HOUR, 100)
 			if err != nil {
 				log.Printf("Error fetching data for %s: %v\n", curr, err)
 				return
 			}
 
-			err = marketDataService.StoreBatchData(curr, records)
+			err = marketDataService.UpsertBatchData(curr, records)
 			if err != nil {
 				log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
 				return

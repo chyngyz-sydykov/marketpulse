@@ -42,25 +42,25 @@ func StartScheduler() {
 		}
 		wg.Wait()
 	})
-	scheduler.Every(4).Hour().Do(func() {
-		log.Println("4 hour scheduler...")
-		var wg sync.WaitGroup
-		for _, currency := range config.DefaultCurrencies {
-			wg.Add(1)
-			go func(curr string) {
+	// scheduler.Every(4).Hour().Do(func() {
+	// 	log.Println("4 hour scheduler...")
+	// 	var wg sync.WaitGroup
+	// 	for _, currency := range config.DefaultCurrencies {
+	// 		wg.Add(1)
+	// 		go func(curr string) {
 
-				defer wg.Done()
-				err := marketDataService.StoreGroupedRecords(curr, config.FOUR_HOUR)
-				if err != nil {
-					log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
-					return
-				}
+	// 			defer wg.Done()
+	// 			err := marketDataService.StoreGroupedRecords(curr, config.FOUR_HOUR)
+	// 			if err != nil {
+	// 				log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
+	// 				return
+	// 			}
 
-			}(currency)
-		}
-		wg.Wait()
+	// 		}(currency)
+	// 	}
+	// 	wg.Wait()
 
-	})
+	// })
 
 	// scheduler.Every(1).Day().Do(func() {
 	// 	log.Println("1 day scheduler...")

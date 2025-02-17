@@ -93,14 +93,15 @@ func FetchKline(currency string, interval string, limit int) ([]*RecordDto, erro
 	for i := 0; i < len(binanceKlineData); i++ {
 		element := binanceKlineData[i]
 		records = append(records, &RecordDto{
-			Symbol:    strings.ToUpper(currency) + "USDT",
-			Timestamp: time.Unix(int64(element[0].(float64))/1000, 0).Truncate(time.Hour), // Kline open time with precision to hour
-			Timeframe: config.ONE_HOUR,
-			Open:      parseFloat(element[1].(string)), // Open price
-			High:      parseFloat(element[2].(string)), // High price
-			Low:       parseFloat(element[3].(string)), // Low price
-			Close:     parseFloat(element[4].(string)), // Close price
-			Volume:    parseFloat(element[5].(string)), // Volume
+			Symbol:     strings.ToUpper(currency) + "USDT",
+			Timestamp:  time.Unix(int64(element[0].(float64))/1000, 0).Truncate(time.Hour), // Kline open time with precision to hour
+			Timeframe:  config.ONE_HOUR,
+			Open:       parseFloat(element[1].(string)), // Open price
+			High:       parseFloat(element[2].(string)), // High price
+			Low:        parseFloat(element[3].(string)), // Low price
+			Close:      parseFloat(element[4].(string)), // Close price
+			Volume:     parseFloat(element[5].(string)), // Volume
+			IsComplete: true,
 		})
 	}
 	return records, nil
