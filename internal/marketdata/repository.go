@@ -20,7 +20,7 @@ func NewMarketDataRepository() *MarketDataRepository {
 	return &MarketDataRepository{}
 }
 
-func (repository *MarketDataRepository) getRecordsWithTimeModulo(currency string, timeframe string, mode int) ([]binance.RecordDto, error) {
+func (repository *MarketDataRepository) getRecords(currency string, timeframe string) ([]binance.RecordDto, error) {
 	query := fmt.Sprintf(`SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume 
 						  FROM data_%s_%s ORDER BY timestamp ASC`, currency, timeframe)
 
@@ -31,7 +31,6 @@ func (repository *MarketDataRepository) getRecordsWithTimeModulo(currency string
 	defer rows.Close()
 
 	var records []binance.RecordDto
-	firstValidRecordFound := false
 
 	for rows.Next() {
 		var record binance.RecordDto
@@ -40,14 +39,6 @@ func (repository *MarketDataRepository) getRecordsWithTimeModulo(currency string
 		if err != nil {
 			return nil, fmt.Errorf("💾 error scanning row: %v", err)
 		}
-		if !firstValidRecordFound {
-			if record.Timestamp.Hour()%mode == 0 {
-				firstValidRecordFound = true
-			} else {
-				continue // Ignore this record and move to the next
-			}
-		}
-
 		records = append(records, record)
 	}
 
@@ -196,7 +187,6 @@ func (repository *MarketDataRepository) upsertBatchByTimeFrame(currency string, 
 		return fmt.Errorf("💾 error starting transaction: %v", err)
 	}
 
-	// Construct bulk UPSERT SQL query
 	var values []interface{}
 	var placeholders []string
 

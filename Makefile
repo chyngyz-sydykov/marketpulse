@@ -41,7 +41,7 @@ migrate-new:
 
 # Run Tests
 test:
-	go test ./... -v -cover  # Run all tests with verbose output and coverage
+	docker exec -it marketpulse bash -c "APP_ENV=test go test -count=1 ./tests -v"
 
 # Run Code Linting
 lint:

@@ -81,36 +81,37 @@ func (service *MarketDataService) StoreGroupedRecords(currency string, groupingT
 
 	if lastCompleteGroupRecord == nil {
 		// No previous 4-hour record → Fetch all 1-hour records within the last 4-hour period
-		oneHourRecords, err = service.repository.getRecordsWithTimeModulo(currency, config.ONE_HOUR, hoursInGroup) // Get all
+		oneHourRecords, err = service.repository.getRecords(currency, config.ONE_HOUR) // Get all
 	} else {
 		// Fetch only 1-hour records after the last 4-hour timestamp
 		oneHourRecords, err = service.repository.getCompleteRecordsAfter(currency, config.ONE_HOUR, lastCompleteGroupRecord.Timestamp)
 	}
-	if err != nil {
-		return err
-	}
-
-	if len(oneHourRecords) < hoursInGroup {
-		// aggregate incomplete 4-hour record
-		aggregatedRecord := service.createIncompleteAggregatedRecord(oneHourRecords, groupingTimeframe)
-		service.repository.upsert(currency, aggregatedRecord)
+	if err != nil || len(oneHourRecords) == 0 {
 		return nil
 	}
-
+	fmt.Println("oneHourRecords", len(oneHourRecords), hoursInGroup)
 	var aggregatedRecords []*binance.RecordDto
 	// Group 1-hour records into 4-hour complete records
-	for i := 0; i+hoursInGroup-1 < len(oneHourRecords); i += hoursInGroup {
-		group := oneHourRecords[i : i+hoursInGroup]
-		aggregatedRecord := service.createCompleteAggregatedRecord(group, groupingTimeframe)
+
+	tempGroup := make([]binance.RecordDto, 0, hoursInGroup)
+	for i := 0; i < len(oneHourRecords); i++ {
+		tempGroup = append(tempGroup, oneHourRecords[i])
+		fmt.Println("time: ", oneHourRecords[i].Timestamp, (oneHourRecords[i].Timestamp.Hour() % hoursInGroup), len(tempGroup))
+		if oneHourRecords[i].Timestamp.Hour()%hoursInGroup == 0 {
+			if len(tempGroup) > 0 {
+				aggregatedRecord := service.createCompleteAggregatedRecord(tempGroup, groupingTimeframe)
+				aggregatedRecords = append(aggregatedRecords, aggregatedRecord)
+				tempGroup = make([]binance.RecordDto, 0, hoursInGroup)
+			}
+		}
+	}
+
+	if len(tempGroup) > 0 {
+		aggregatedRecord := service.createIncompleteAggregatedRecord(tempGroup, groupingTimeframe)
 		aggregatedRecords = append(aggregatedRecords, aggregatedRecord)
 	}
-	// If there are remaining 1-hour records, create an incomplete 4-hour record
-	if (len(aggregatedRecords)*hoursInGroup < len(oneHourRecords)) && len(aggregatedRecords) != 0 {
-		group := oneHourRecords[len(aggregatedRecords)*hoursInGroup:]
-		aggregatedRecord := service.createIncompleteAggregatedRecord(group, groupingTimeframe)
-		aggregatedRecords = append(aggregatedRecords, aggregatedRecord)
-	}
-	fmt.Println("aggregatedRecords", len(aggregatedRecords), aggregatedRecords[0])
+
+	fmt.Println("aggregatedRecords", len(aggregatedRecords))
 	// Insert aggregated records into the 4-hour table
 	if len(aggregatedRecords) != 0 {
 		err = service.repository.upsertBatchByTimeFrame(currency, aggregatedRecords[0].Timeframe, aggregatedRecords)
@@ -132,11 +133,11 @@ func (service *MarketDataService) createIncompleteAggregatedRecord(records []bin
 	aggregatedRecord := service.aggregator.Aggregate(records, timeframe)
 	recordTimestamp := aggregatedRecord.Timestamp
 	if timeframe == "4h" {
-		// set the timestamp to nearest future 4h timestamp (3h, 7h, 11h, ...)
-		aggregatedRecord.Timestamp = recordTimestamp.Truncate(4 * time.Hour).Add(3 * time.Hour)
+		// set the timestamp to nearest future 4h timestamp (4h, 8h, 12h, ...)
+		aggregatedRecord.Timestamp = recordTimestamp.Truncate(4 * time.Hour).Add(4 * time.Hour)
 	} else if timeframe == "1d" {
 		// set the timestamp to nearest future 1d timestamp
-		aggregatedRecord.Timestamp = recordTimestamp.Truncate(24 * time.Hour).Add(23 * time.Hour)
+		aggregatedRecord.Timestamp = recordTimestamp.Truncate(24 * time.Hour).Add(24 * time.Hour)
 	}
 	aggregatedRecord.Trend = service.indicator.Trend(aggregatedRecord)
 	aggregatedRecord.IsComplete = false

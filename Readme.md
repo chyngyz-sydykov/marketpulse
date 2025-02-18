@@ -26,10 +26,19 @@ force migration `docker run --rm -v $(pwd)/migrations:/migrations --network=host
 
 
 create migration `docker run --rm -v $(pwd)/migrations:/migrations --network=host migrate/migrate create -ext sql -dir /migrations -seq add_column_phone`
-#
- Testing
 
-No testing for now
+# Testing
+
+On initial project setup, please manually create a database for tests. check the database name in env.test file. to run use following commands:
+
+run tests `APP_ENV=test go test ./tests/`
+
+run tests without cache `go test -count=1 ./tests/`
+
+run tests within docker (preferred way) `docker exec -it marketpulse bash -c "go test -count=1 ./tests"`
+
+run test coverage on local machine `docker exec -it marketpulse bash "scripts/coverage.sh"`
+`go tool cover -html=coverage/filtered_coverage.out`
 
 # Handy commands
 
