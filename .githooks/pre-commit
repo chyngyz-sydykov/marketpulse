@@ -1,0 +1,17 @@
+#!/bin/bash
+
+echo "Running Go tests inside Docker..."
+
+# Run the tests inside the Docker container
+docker exec marketpulse bash -c "APP_ENV=test go test -count=1 ./tests -v"
+TEST_EXIT_CODE=$?
+
+# If tests fail, prevent commit
+if [ $TEST_EXIT_CODE -ne 0 ]; then
+    echo "❌ Tests failed! Commit aborted."
+    exit 1
+else
+    echo "✅ All tests passed! Proceeding with commit."
+    exit 0
+fi
+
