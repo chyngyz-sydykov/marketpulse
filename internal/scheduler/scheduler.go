@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
+	"github.com/chyngyz-sydykov/marketpulse/internal/app"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
-	"github.com/chyngyz-sydykov/marketpulse/internal/marketdata"
 
 	"github.com/go-co-op/gocron"
 )
@@ -15,7 +15,6 @@ import (
 // StartScheduler initializes a gocron job to fetch market data every hour
 func StartScheduler() {
 	scheduler := gocron.NewScheduler(time.UTC)
-	marketDataService := marketdata.NewMarketDataService()
 
 	scheduler.Every(1).Hour().Do(func() {
 		log.Println("hourly scheduler...")
@@ -32,7 +31,7 @@ func StartScheduler() {
 					return
 				}
 
-				err = marketDataService.StoreData(curr, records[0])
+				err = app.App.MarketDataService.StoreData(curr, records[0])
 				if err != nil {
 					log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
 					return

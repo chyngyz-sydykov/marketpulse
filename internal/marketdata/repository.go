@@ -4,11 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"slices"
 	"strings"
 	"time"
 
-	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
 	"github.com/chyngyz-sydykov/marketpulse/internal/database"
 )
@@ -149,32 +147,6 @@ func (repository *MarketDataRepository) upsert(currency string, data *binance.Re
 	log.Println("✅ data upserted successfully!")
 	return nil
 
-}
-func (repository *MarketDataRepository) store(currency string, data *binance.RecordDto) error {
-	// TODO do i need this check?
-	if !slices.Contains(config.DefaultCurrencies, currency) {
-		return fmt.Errorf("unknown currency: %s", currency)
-	} else {
-		tx, err := database.DB.Begin()
-		if err != nil {
-			return fmt.Errorf("💾 error starting transaction: %v", err)
-		}
-
-		query := `INSERT INTO data_` + currency + ` (symbol, timestamp, timeframe, open, high, low, close, volume, trend, is_complete) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
-		_, err = tx.Exec(query, data.Symbol, data.Timestamp, data.Timeframe, data.Open, data.High, data.Low, data.Close, data.Volume, data.Trend, data.IsComplete)
-		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("💾 error inserting data: %v", err)
-		}
-		err = tx.Commit()
-		if err != nil {
-			return fmt.Errorf("💾 error committing transaction: %v", err)
-		}
-
-		log.Println("✅ data stored successfully!")
-		return nil
-	}
 }
 
 func (repository *MarketDataRepository) upsertBatchByTimeFrame(currency string, timeFrame string, records []*binance.RecordDto) error {

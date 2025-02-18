@@ -23,6 +23,8 @@ var ONE_DAY = "1d"
 var SEVEN_DAY = "7d"
 var THIRTY_DAY = "30d"
 
+var SERVICE_NAME = "MarketPulse"
+
 var COLOR_RESET = "\033[0m"
 var COLOR_RED = "\033[31m"
 var COLOR_GREEN = "\033[32m"

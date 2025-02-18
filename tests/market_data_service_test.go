@@ -22,14 +22,15 @@ type MarketDataServiceTestSuite struct {
 	service *marketdata.MarketDataService
 }
 
-// Load .env.test & Setup DB Connection
 func (suite *MarketDataServiceTestSuite) SetupSuite() {
 	err := database.ConnectDB()
 	if err != nil {
 		log.Fatal("❌ Failed to connect to database:", err)
 	}
 
-	suite.service = marketdata.NewMarketDataService()
+	mockRedis := &MockRedisService{}
+
+	suite.service = marketdata.NewMarketDataService(mockRedis)
 	suite.db = database.DB
 }
 
@@ -112,6 +113,60 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroupTwo1HRecordsToNotComplete
 		Low:        0,
 		Close:      6,
 		Volume:     2,
+		IsComplete: false,
+	}, stored)
+	assert.Equal(suite.T(), calculateTrend(stored.Open, stored.Close), stored.Trend)
+}
+
+func (suite *MarketDataServiceTestSuite) TestShouldGroupUpdateExistingInCompleteGroupRecordWhenNew1HRecordIsAdded() {
+	timestamp1 := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 1, 0, 0, 0, time.Now().Location())
+	timestamp2 := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 2, 0, 0, 0, time.Now().Location())
+	suite.db.Exec(`INSERT INTO data_btc_1h (symbol, timeframe, timestamp, open, high, low, close, volume, is_complete)
+							 VALUES
+							 ('btc', '1h', $1, 1, 10, 1, 5, 1, true),
+							 ('btc', '1h', $2, 2, 11, 0, 6, 1, true)`, timestamp1, timestamp2)
+
+	err := suite.service.StoreGroupedRecords("btc", "4h")
+	assert.NoError(suite.T(), err)
+
+	var count int
+	err = suite.db.QueryRow(`SELECT COUNT(*) FROM data_btc_4h`).Scan(&count)
+	assert.NoError(suite.T(), err)
+	assert.Equal(suite.T(), 1, count)
+
+	var stored binance.RecordDto
+	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
+		Scan(&stored.Open, &stored.High, &stored.Low, &stored.Close, &stored.Volume, &stored.IsComplete, &stored.Trend)
+	assert.NoError(suite.T(), err)
+	suite.assertRecordValues(binance.RecordDto{
+		Open:       1,
+		High:       11,
+		Low:        0,
+		Close:      6,
+		Volume:     2,
+		IsComplete: false,
+	}, stored)
+	assert.Equal(suite.T(), calculateTrend(stored.Open, stored.Close), stored.Trend)
+
+	timestamp3 := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 3, 0, 0, 0, time.Now().Location())
+	suite.db.Exec(`INSERT INTO data_btc_1h (symbol, timeframe, timestamp, open,close, low, high, volume, is_complete)
+							 VALUES ('btc', '1h', $1, 2, 9, 0, 12, 2, true)`, timestamp3)
+	// update existing 4h record
+	err = suite.service.StoreGroupedRecords("btc", "4h")
+	assert.NoError(suite.T(), err)
+
+	suite.db.QueryRow(`SELECT COUNT(*) FROM data_btc_4h`).Scan(&count)
+	assert.Equal(suite.T(), 1, count)
+
+	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
+		Scan(&stored.Open, &stored.High, &stored.Low, &stored.Close, &stored.Volume, &stored.IsComplete, &stored.Trend)
+	assert.NoError(suite.T(), err)
+	suite.assertRecordValues(binance.RecordDto{
+		Open:       1,
+		Close:      9,
+		Low:        0,
+		High:       12,
+		Volume:     4,
 		IsComplete: false,
 	}, stored)
 	assert.Equal(suite.T(), calculateTrend(stored.Open, stored.Close), stored.Trend)
@@ -250,6 +305,8 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsBetweenDaysTo4Ho
 	}, incomplete4hData)
 	assert.Equal(suite.T(), calculateTrend(incomplete4hData.Open, incomplete4hData.Close), incomplete4hData.Trend)
 }
+
+//TODO create grouped record, then updated group record. check that data is updated
 
 func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 	_, err := suite.db.Exec("DELETE FROM data_btc_1h; DELETE FROM data_btc_1d;")

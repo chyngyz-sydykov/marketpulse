@@ -1,16 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
+	"github.com/chyngyz-sydykov/marketpulse/internal/app"
 	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
 	"github.com/chyngyz-sydykov/marketpulse/internal/database"
-	"github.com/chyngyz-sydykov/marketpulse/internal/marketdata"
 	"github.com/chyngyz-sydykov/marketpulse/internal/redis"
+	"github.com/chyngyz-sydykov/marketpulse/internal/scheduler"
 )
 
 func main() {
@@ -28,26 +30,14 @@ func main() {
 	}
 	defer redis.Redis.Close()
 
-	//getAlotOfData()
+	app.NewContainer()
+
 	// Start the scheduler to fetch market data every hour
-	//scheduler.StartScheduler()
-	//in := indicator.NewIndicator()
-	// marketdataService := marketdata.NewMarketDataService()
-	// var wg sync.WaitGroup
-	// for _, currency := range config.DefaultCurrencies {
-	// 	wg.Add(1)
-	// 	go func(curr string) {
+	scheduler.StartScheduler()
 
-	// 		defer wg.Done()
-	// 		err := marketdataService.StoreGroupedRecords(curr, config.FOUR_HOUR)
-	// 		if err != nil {
-	// 			log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
-	// 			return
-	// 		}
+	startEventListeners()
+	//getAlotOfData()
 
-	// 	}(currency)
-	// }
-	// wg.Wait()
 	// get data from binance every hour
 	// save 1h data to db
 	// save 4h data and indicators to db if 4h passed
@@ -60,11 +50,44 @@ func main() {
 	}
 }
 
+func startEventListeners() {
+	redisService := redis.NewRedisService(redis.Redis)
+
+	// Example: Publish an event
+	ctx := context.Background()
+
+	// Example: Subscribe to events
+	go redisService.SubscribeToEvent(ctx, "NewRecordAdded", func(event redis.Event) {
+		log.Printf("Received event: %s from %s", event.Name, event.Source)
+		//indicatorService := indicator.NewIndicator()
+		var wg sync.WaitGroup
+		for _, currency := range config.DefaultCurrencies {
+			wg.Add(1)
+			go func(curr string) {
+				defer wg.Done()
+
+				err := app.App.MarketDataService.StoreGroupedRecords(curr, config.ONE_HOUR)
+				if err != nil {
+					log.Printf("Error storing records for %s: %v", curr, err)
+				}
+
+				err = app.App.MarketDataService.StoreGroupedRecords(curr, config.ONE_HOUR)
+				if err != nil {
+					log.Printf("Error storing records for %s: %v", curr, err)
+				}
+
+				//indicatorService.ComputeAndStore(currency, config.FOUR_HOUR)
+
+			}(currency)
+		}
+		wg.Wait()
+	})
+}
+
 func getAlotOfData() {
 	startTime := time.Now() // Start timing execution
 	log.Println("get a lot of data from binance...")
 	var wg sync.WaitGroup
-	marketDataService := marketdata.NewMarketDataService()
 	for _, currency := range config.DefaultCurrencies {
 		wg.Add(1)
 		go func(curr string) {
@@ -77,7 +100,7 @@ func getAlotOfData() {
 				return
 			}
 
-			err = marketDataService.UpsertBatchData(curr, records)
+			err = app.App.MarketDataService.UpsertBatchData(curr, records)
 			if err != nil {
 				log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
 				return
