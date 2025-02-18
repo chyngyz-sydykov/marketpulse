@@ -7,8 +7,8 @@ import (
 	"slices"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
-	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
-	"github.com/chyngyz-sydykov/marketpulse/internal/database"
+	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/database"
 )
 
 type IndicatorRepository struct {
@@ -17,7 +17,7 @@ type IndicatorRepository struct {
 func NewIndicatorRepository() *IndicatorRepository {
 	return &IndicatorRepository{}
 }
-func (repository *IndicatorRepository) checkIfRecordExistsByTimestampAndTimeframe(currency string, data *binance.IndicatorDto) (bool, error) {
+func (repository *IndicatorRepository) checkIfRecordExistsByTimestampAndTimeframe(currency string, data *dto.IndicatorDto) (bool, error) {
 	query := fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM indicator_%s_%s WHERE timestamp = $1)`, currency, data.Timeframe)
 
 	var exists bool
@@ -32,13 +32,13 @@ func (repository *IndicatorRepository) checkIfRecordExistsByTimestampAndTimefram
 
 	return exists, nil
 }
-func (repository *IndicatorRepository) getLastRecord(currency, timeframe string) (*binance.IndicatorDto, error) {
+func (repository *IndicatorRepository) getLastRecord(currency, timeframe string) (*dto.IndicatorDto, error) {
 	query := fmt.Sprintf(`SELECT timeframe, timestamp, sma, ema, std_dev, lower_bollinger, upper_bollinger, volatility, rsi, macd, macd_signal, data_timestamp 
 						  FROM indicator_%s_%s ORDER BY timestamp DESC LIMIT 1`, currency, timeframe)
 
 	row := database.DB.QueryRow(query)
 
-	var record binance.IndicatorDto
+	var record dto.IndicatorDto
 	err := row.Scan(&record.Timeframe, &record.Timestamp, &record.SMA, &record.EMA, &record.StdDev, &record.LowerBollinger, &record.UpperBollinger, &record.Volatility, &record.RSI, &record.MACD, &record.MACDSignal, &record.DataTimestamp)
 
 	if err != nil {
@@ -51,7 +51,7 @@ func (repository *IndicatorRepository) getLastRecord(currency, timeframe string)
 	return &record, nil
 }
 
-func (repository *IndicatorRepository) storeData(currency string, data *binance.IndicatorDto) error {
+func (repository *IndicatorRepository) storeData(currency string, data *dto.IndicatorDto) error {
 	//TODO should this be here?
 	if !slices.Contains(config.DefaultCurrencies, currency) {
 		return fmt.Errorf("unknown currency: %s", currency)
@@ -82,6 +82,6 @@ func (repository *IndicatorRepository) storeData(currency string, data *binance.
 	}
 }
 
-func (repository *IndicatorRepository) storeDataBatch(currency string, records []*binance.RecordDto) error {
+func (repository *IndicatorRepository) storeDataBatch(currency string, records []*dto.RecordDto) error {
 	return nil
 }

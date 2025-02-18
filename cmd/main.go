@@ -9,10 +9,10 @@ import (
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/app"
-	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
-	"github.com/chyngyz-sydykov/marketpulse/internal/database"
-	"github.com/chyngyz-sydykov/marketpulse/internal/redis"
-	"github.com/chyngyz-sydykov/marketpulse/internal/scheduler"
+	"github.com/chyngyz-sydykov/marketpulse/internal/app/scheduler"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/binance"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/database"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/redis"
 )
 
 func main() {

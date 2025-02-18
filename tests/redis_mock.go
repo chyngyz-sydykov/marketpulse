@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/chyngyz-sydykov/marketpulse/internal/redis"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/redis"
 )
 
 // MockRedisService implements RedisServiceInterface for testing

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
-	"github.com/chyngyz-sydykov/marketpulse/internal/database"
-	"github.com/chyngyz-sydykov/marketpulse/internal/marketdata"
+	"github.com/chyngyz-sydykov/marketpulse/internal/core/marketdata"
+	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -48,7 +48,7 @@ func calculateTrend(open, close float64) float64 {
 
 // ✅ Test Case 1: Store 1H Record
 func (suite *MarketDataServiceTestSuite) TestShouldStoreSingleRecord() {
-	record := &binance.RecordDto{
+	record := &dto.RecordDto{
 		Symbol:     "BTCUSDT",
 		Timeframe:  "1h",
 		Timestamp:  time.Now().Truncate(time.Hour),
@@ -71,7 +71,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldStoreSingleRecord() {
 
 // ✅ Test Case 2: Store Multiple 1H Records
 func (suite *MarketDataServiceTestSuite) TestShouldStoreMultipleRecordsWithBatchUpsert() {
-	records := []*binance.RecordDto{
+	records := []*dto.RecordDto{
 		{Symbol: "BTCUSDT", Timeframe: "1h", Timestamp: time.Now().Add(-time.Hour), Open: 210, High: 220, Low: 200, Close: 205, Volume: 222, IsComplete: true},
 		{Symbol: "BTCUSDT", Timeframe: "1h", Timestamp: time.Now(), Open: 211, High: 221, Low: 201, Close: 206, Volume: 223, IsComplete: true},
 	}
@@ -103,11 +103,11 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroupTwo1HRecordsToNotComplete
 	assert.NoError(suite.T(), err)
 	assert.Equal(suite.T(), 1, count)
 
-	var stored binance.RecordDto
+	var stored dto.RecordDto
 	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
 		Scan(&stored.Open, &stored.High, &stored.Low, &stored.Close, &stored.Volume, &stored.IsComplete, &stored.Trend)
 	assert.NoError(suite.T(), err)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       1,
 		High:       11,
 		Low:        0,
@@ -134,11 +134,11 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroupUpdateExistingInComplete
 	assert.NoError(suite.T(), err)
 	assert.Equal(suite.T(), 1, count)
 
-	var stored binance.RecordDto
+	var stored dto.RecordDto
 	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
 		Scan(&stored.Open, &stored.High, &stored.Low, &stored.Close, &stored.Volume, &stored.IsComplete, &stored.Trend)
 	assert.NoError(suite.T(), err)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       1,
 		High:       11,
 		Low:        0,
@@ -161,7 +161,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroupUpdateExistingInComplete
 	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
 		Scan(&stored.Open, &stored.High, &stored.Low, &stored.Close, &stored.Volume, &stored.IsComplete, &stored.Trend)
 	assert.NoError(suite.T(), err)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       1,
 		Close:      9,
 		Low:        0,
@@ -192,11 +192,11 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsWithinTimeTangeT
 	assert.NoError(suite.T(), err)
 	assert.Equal(suite.T(), 1, count)
 
-	var complete4hData binance.RecordDto
+	var complete4hData dto.RecordDto
 	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
 		Scan(&complete4hData.Open, &complete4hData.High, &complete4hData.Low, &complete4hData.Close, &complete4hData.Volume, &complete4hData.IsComplete, &complete4hData.Trend)
 	assert.NoError(suite.T(), err)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       1,
 		Close:      8,
 		Low:        0,
@@ -234,7 +234,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsExceedingTimeRan
 	assert.Equal(suite.T(), 2, count)
 
 	complete4hData := suite.getDataByTimeframeAndTimestamp("4h", timestamp4)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       1,
 		Close:      8,
 		Low:        0,
@@ -246,7 +246,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsExceedingTimeRan
 
 	next4HGroupTime := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 8, 0, 0, 0, time.Now().Location())
 	incomplete4hData := suite.getDataByTimeframeAndTimestamp("4h", next4HGroupTime)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       1,
 		Close:      1,
 		Low:        2,
@@ -284,7 +284,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsBetweenDaysTo4Ho
 
 	complete4hData := suite.getDataByTimeframeAndTimestamp("4h", midnight)
 
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       100,
 		Close:      115,
 		Low:        80,
@@ -295,7 +295,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsBetweenDaysTo4Ho
 
 	next4HGroupTime := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 4, 0, 0, 0, time.Now().Location())
 	incomplete4hData := suite.getDataByTimeframeAndTimestamp("4h", next4HGroupTime)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       115,
 		Close:      130,
 		Low:        70,
@@ -313,11 +313,11 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 	if err != nil {
 		log.Fatalf("❌ Failed to clean DB: %v", err)
 	}
-	var records []*binance.RecordDto
+	var records []*dto.RecordDto
 
 	for i := 1; i < 50; i++ {
 		tmpTime := time.Date(2020, 1, 1, i+1, 0, 0, 0, time.Now().Location())
-		records = append(records, &binance.RecordDto{
+		records = append(records, &dto.RecordDto{
 			Symbol:     "BTCUSDT",
 			Timeframe:  "1h",
 			Timestamp:  tmpTime,
@@ -346,7 +346,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 
 	jan2Time := time.Date(2020, 1, 1, 24, 0, 0, 0, time.Now().Location())
 	jan2Data := suite.getDataByTimeframeAndTimestamp("1d", jan2Time)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       1,
 		Close:      23,
 		Low:        0,
@@ -357,7 +357,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 
 	jan3Time := time.Date(2020, 1, 2, 24, 0, 0, 0, time.Now().Location())
 	jan3Data := suite.getDataByTimeframeAndTimestamp("1d", jan3Time)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       24,
 		Close:      47,
 		Low:        23,
@@ -368,7 +368,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 
 	jan4Time := time.Date(2020, 1, 3, 24, 0, 0, 0, time.Now().Location())
 	jan4Data := suite.getDataByTimeframeAndTimestamp("1d", jan4Time)
-	suite.assertRecordValues(binance.RecordDto{
+	suite.assertRecordValues(dto.RecordDto{
 		Open:       48,
 		Close:      49,
 		Low:        47,
@@ -378,7 +378,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 	}, jan4Data)
 }
 
-func (suite *MarketDataServiceTestSuite) assertRecordValues(expected, actual binance.RecordDto) {
+func (suite *MarketDataServiceTestSuite) assertRecordValues(expected, actual dto.RecordDto) {
 	assert.Equal(suite.T(), expected.Open, actual.Open)
 	assert.Equal(suite.T(), expected.Close, actual.Close)
 	assert.Equal(suite.T(), expected.Low, actual.Low)
@@ -387,8 +387,8 @@ func (suite *MarketDataServiceTestSuite) assertRecordValues(expected, actual bin
 	assert.Equal(suite.T(), expected.IsComplete, actual.IsComplete)
 }
 
-func (suite *MarketDataServiceTestSuite) getDataByTimeframeAndTimestamp(timeframe string, time time.Time) binance.RecordDto {
-	var data binance.RecordDto
+func (suite *MarketDataServiceTestSuite) getDataByTimeframeAndTimestamp(timeframe string, time time.Time) dto.RecordDto {
+	var data dto.RecordDto
 	query := fmt.Sprintf(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_%s WHERE timestamp = $1`, timeframe)
 	err := suite.db.QueryRow(query, time).
 		Scan(&data.Open, &data.High, &data.Low, &data.Close, &data.Volume, &data.IsComplete, &data.Trend)

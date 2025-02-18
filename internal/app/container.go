@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/chyngyz-sydykov/marketpulse/internal/marketdata"
-	"github.com/chyngyz-sydykov/marketpulse/internal/redis"
+	"github.com/chyngyz-sydykov/marketpulse/internal/core/marketdata"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/redis"
 )
 
 var App *Container

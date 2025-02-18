@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
-	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
-	"github.com/chyngyz-sydykov/marketpulse/internal/indicator"
-	aggregator "github.com/chyngyz-sydykov/marketpulse/internal/marketdata/aggregator"
-	"github.com/chyngyz-sydykov/marketpulse/internal/redis"
-	"github.com/chyngyz-sydykov/marketpulse/internal/validator"
+	"github.com/chyngyz-sydykov/marketpulse/internal/core/indicator"
+	aggregator "github.com/chyngyz-sydykov/marketpulse/internal/core/marketdata/aggregator"
+	"github.com/chyngyz-sydykov/marketpulse/internal/core/validator"
+	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/redis"
 )
 
 type MarketDataService struct {
@@ -35,7 +35,7 @@ func NewMarketDataService(redis redis.RedisServiceInterface) *MarketDataService 
 	}
 }
 
-func (service *MarketDataService) StoreData(currency string, data *binance.RecordDto) error {
+func (service *MarketDataService) StoreData(currency string, data *dto.RecordDto) error {
 	if err := service.validator.ValidateCurrencyAndTimeframe(currency, data.Timeframe); err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (service *MarketDataService) StoreData(currency string, data *binance.Recor
 	return service.publishEvent("NewRecordAdded")
 }
 
-func (service *MarketDataService) UpsertBatchData(currency string, data []*binance.RecordDto) error {
+func (service *MarketDataService) UpsertBatchData(currency string, data []*dto.RecordDto) error {
 	timeFrame := data[0].Timeframe
 	if err := service.validator.ValidateCurrencyAndTimeframe(currency, timeFrame); err != nil {
 		return err
@@ -84,7 +84,7 @@ func (service *MarketDataService) StoreGroupedRecords(currency string, groupingT
 	}
 	hoursInGroup := config.HoursByTimeframe[groupingTimeframe]
 
-	var oneHourRecords []binance.RecordDto
+	var oneHourRecords []dto.RecordDto
 	if lastCompleteGroupRecord == nil {
 		// No previous 4-hour record → Fetch all 1-hour records within the last 4-hour period
 		oneHourRecords, err = service.repository.getRecords(currency, config.ONE_HOUR) // Get all
@@ -120,11 +120,11 @@ func (service *MarketDataService) publishEvent(eventName string) error {
 
 }
 
-func (service *MarketDataService) calculateAndStoreIndicators(currency string, groupedRecords [][]binance.RecordDto) error {
+func (service *MarketDataService) calculateAndStoreIndicators(currency string, groupedRecords [][]dto.RecordDto) error {
 	var wg sync.WaitGroup
 	for i := 0; i < len(groupedRecords); i++ {
 		wg.Add(1)
-		go func(group []binance.RecordDto) {
+		go func(group []dto.RecordDto) {
 			defer wg.Done()
 
 			err := service.indicator.ComputeAndStore(currency, group)

@@ -7,7 +7,7 @@ import (
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/app"
-	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/binance"
 
 	"github.com/go-co-op/gocron"
 )

@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
+	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
 )
 
 // FetchMarketData retrieves data from Binance API
-func FetchTicker(currency string) (*RecordDto, error) {
+func FetchTicker(currency string) (*dto.RecordDto, error) {
 
 	cfg := config.LoadConfig()
 	client := GetHTTPClient()
@@ -36,14 +37,14 @@ func FetchTicker(currency string) (*RecordDto, error) {
 		return nil, err
 	}
 
-	var binanceTickerData BinanceTickerResponse
+	var binanceTickerData dto.BinanceTickerResponse
 
 	fmt.Println("body:", string(body))
 	if err := json.Unmarshal(body, &binanceTickerData); err != nil {
 		return nil, err
 	}
 
-	return &RecordDto{
+	return &dto.RecordDto{
 		Symbol:    binanceTickerData.Symbol,
 		Timestamp: time.Now(),
 		Timeframe: config.ONE_HOUR,
@@ -56,7 +57,7 @@ func FetchTicker(currency string) (*RecordDto, error) {
 }
 
 // FetchMarketData retrieves data from Binance API
-func FetchKline(currency string, interval string, limit int) ([]*RecordDto, error) {
+func FetchKline(currency string, interval string, limit int) ([]*dto.RecordDto, error) {
 
 	cfg := config.LoadConfig()
 	client := GetHTTPClient()
@@ -88,11 +89,11 @@ func FetchKline(currency string, interval string, limit int) ([]*RecordDto, erro
 		return nil, fmt.Errorf("unexpected response format")
 	}
 
-	records := make([]*RecordDto, 0, len(binanceKlineData))
+	records := make([]*dto.RecordDto, 0, len(binanceKlineData))
 
 	for i := 0; i < len(binanceKlineData); i++ {
 		element := binanceKlineData[i]
-		records = append(records, &RecordDto{
+		records = append(records, &dto.RecordDto{
 			Symbol:     strings.ToUpper(currency) + "USDT",
 			Timestamp:  time.Unix(int64(element[0].(float64))/1000, 0).Truncate(time.Hour), // Kline open time with precision to hour
 			Timeframe:  config.ONE_HOUR,

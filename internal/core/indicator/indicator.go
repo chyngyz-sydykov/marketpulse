@@ -7,8 +7,8 @@ import (
 	"math"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
-	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
-	"github.com/chyngyz-sydykov/marketpulse/internal/utils"
+	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
+	"github.com/chyngyz-sydykov/marketpulse/internal/pkg/utils"
 )
 
 type Indicator struct {
@@ -26,7 +26,7 @@ func (service *Indicator) ComputeAndStoreByTimeframe(currency string, groupingTi
 	return nil
 }
 
-func (service *Indicator) ComputeAndStore(currency string, history []binance.RecordDto) error {
+func (service *Indicator) ComputeAndStore(currency string, history []dto.RecordDto) error {
 
 	service.currency = currency
 	fmt.Println("💡 Computing indicators...")
@@ -34,7 +34,7 @@ func (service *Indicator) ComputeAndStore(currency string, history []binance.Rec
 		log.Printf("%s", config.COLOR_YELLOW+"not enough data to calculate indicators"+config.COLOR_RESET)
 		return nil
 	}
-	indicatorDto := &binance.IndicatorDto{}
+	indicatorDto := &dto.IndicatorDto{}
 	err := service.setMetadata(indicatorDto, history)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func (service *Indicator) ComputeAndStore(currency string, history []binance.Rec
 	return nil
 }
 
-func (service *Indicator) CalculateAllIndicators(history []binance.RecordDto, indicatorDto *binance.IndicatorDto) error {
+func (service *Indicator) CalculateAllIndicators(history []dto.RecordDto, indicatorDto *dto.IndicatorDto) error {
 	// Extract close prices from historical data
 	var closePrices []float64
 	var highPrices []float64
@@ -96,7 +96,7 @@ func (service *Indicator) CalculateAllIndicators(history []binance.RecordDto, in
 	return nil
 }
 
-func (service *Indicator) setMetadata(indicatorDto *binance.IndicatorDto, history []binance.RecordDto) error {
+func (service *Indicator) setMetadata(indicatorDto *dto.IndicatorDto, history []dto.RecordDto) error {
 	nextTimeframe := utils.GetNextTimeframe(history[0].Timeframe)
 	if nextTimeframe == "" {
 		return fmt.Errorf("no next timeframe for %s", history[0].Timeframe)
@@ -109,7 +109,7 @@ func (service *Indicator) setMetadata(indicatorDto *binance.IndicatorDto, histor
 	return nil
 }
 
-func (service *Indicator) SMA(prices []float64, indicatorDto *binance.IndicatorDto) {
+func (service *Indicator) SMA(prices []float64, indicatorDto *dto.IndicatorDto) {
 	period := len(prices)
 	sum := 0.0
 	for _, price := range prices {
@@ -119,7 +119,7 @@ func (service *Indicator) SMA(prices []float64, indicatorDto *binance.IndicatorD
 }
 
 // Exponential Moving Average (EMA)
-func (service *Indicator) EMA(prices []float64, indicatorDto *binance.IndicatorDto, period int) {
+func (service *Indicator) EMA(prices []float64, indicatorDto *dto.IndicatorDto, period int) {
 	previousIndicator, err := service.repository.getLastRecord(service.currency, config.FOUR_HOUR)
 	if err != nil && err != sql.ErrNoRows {
 		return
@@ -136,7 +136,7 @@ func (service *Indicator) EMA(prices []float64, indicatorDto *binance.IndicatorD
 }
 
 // Standard Deviation
-func (service *Indicator) StandardDeviation(prices []float64, indicatorDto *binance.IndicatorDto) {
+func (service *Indicator) StandardDeviation(prices []float64, indicatorDto *dto.IndicatorDto) {
 	mean := indicatorDto.SMA
 	sum := 0.0
 	for _, price := range prices {
@@ -145,12 +145,12 @@ func (service *Indicator) StandardDeviation(prices []float64, indicatorDto *bina
 	indicatorDto.StdDev = math.Sqrt(sum / float64(len(prices)))
 }
 
-func (service *Indicator) Bollinger(indicatorDto *binance.IndicatorDto) {
+func (service *Indicator) Bollinger(indicatorDto *dto.IndicatorDto) {
 	indicatorDto.LowerBollinger = indicatorDto.SMA - 2*indicatorDto.StdDev
 	indicatorDto.UpperBollinger = indicatorDto.SMA + 2*indicatorDto.StdDev
 }
 
-func (service *Indicator) RSI(prices []float64, indicatorDto *binance.IndicatorDto) {
+func (service *Indicator) RSI(prices []float64, indicatorDto *dto.IndicatorDto) {
 	gain, loss := 0.0, 0.0
 	period := len(prices)
 	for i := 1; i < period; i++ {
@@ -184,9 +184,9 @@ func (service *Indicator) RSI(prices []float64, indicatorDto *binance.IndicatorD
 // 	return indicator.EMA(macdValues, signalPeriod)
 // }
 
-func (service *Indicator) Trend(data *binance.RecordDto) float64 {
+func (service *Indicator) Trend(data *dto.RecordDto) float64 {
 	return math.Round((data.Close-data.Open)/data.Open*10000) / 10000
 }
-func (service *Indicator) Volatility(highPrices []float64, lowPrices []float64, closePrices []float64, indicatorDto *binance.IndicatorDto) {
+func (service *Indicator) Volatility(highPrices []float64, lowPrices []float64, closePrices []float64, indicatorDto *dto.IndicatorDto) {
 	indicatorDto.Volatility = (highPrices[len(highPrices)-1] - lowPrices[len(lowPrices)-1]) / closePrices[len(highPrices)-1]
 }

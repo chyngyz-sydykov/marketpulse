@@ -3,8 +3,8 @@ package marketdata
 import (
 	"time"
 
-	"github.com/chyngyz-sydykov/marketpulse/internal/binance"
-	"github.com/chyngyz-sydykov/marketpulse/internal/indicator"
+	"github.com/chyngyz-sydykov/marketpulse/internal/core/indicator"
+	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
 )
 
 type Aggregator struct {
@@ -16,17 +16,17 @@ func NewAggregator(indicator *indicator.Indicator) *Aggregator {
 		indicator: indicator,
 	}
 }
-func (a *Aggregator) GroupRecords(records []binance.RecordDto, hoursInGroup int, timeframe string) ([]*binance.RecordDto, error) {
-	var aggregatedRecords []*binance.RecordDto
+func (a *Aggregator) GroupRecords(records []dto.RecordDto, hoursInGroup int, timeframe string) ([]*dto.RecordDto, error) {
+	var aggregatedRecords []*dto.RecordDto
 	// Group 1-hour records into complete grouped records
-	tempGroup := make([]binance.RecordDto, 0, hoursInGroup)
+	tempGroup := make([]dto.RecordDto, 0, hoursInGroup)
 	for i := 0; i < len(records); i++ {
 		tempGroup = append(tempGroup, records[i])
 		if records[i].Timestamp.Hour()%hoursInGroup == 0 {
 			if len(tempGroup) > 0 {
 				aggregatedRecord := a.createCompleteAggregatedRecord(tempGroup, timeframe)
 				aggregatedRecords = append(aggregatedRecords, aggregatedRecord)
-				tempGroup = make([]binance.RecordDto, 0, hoursInGroup)
+				tempGroup = make([]dto.RecordDto, 0, hoursInGroup)
 			}
 		}
 	}
@@ -38,13 +38,13 @@ func (a *Aggregator) GroupRecords(records []binance.RecordDto, hoursInGroup int,
 	return aggregatedRecords, nil
 }
 
-func (a *Aggregator) createCompleteAggregatedRecord(records []binance.RecordDto, timeframe string) *binance.RecordDto {
+func (a *Aggregator) createCompleteAggregatedRecord(records []dto.RecordDto, timeframe string) *dto.RecordDto {
 	aggregatedRecord := a.aggregate(records, timeframe)
 	aggregatedRecord.Trend = a.indicator.Trend(aggregatedRecord)
 	aggregatedRecord.IsComplete = true
 	return aggregatedRecord
 }
-func (a *Aggregator) createIncompleteAggregatedRecord(records []binance.RecordDto, timeframe string) *binance.RecordDto {
+func (a *Aggregator) createIncompleteAggregatedRecord(records []dto.RecordDto, timeframe string) *dto.RecordDto {
 	aggregatedRecord := a.aggregate(records, timeframe)
 	recordTimestamp := aggregatedRecord.Timestamp
 	if timeframe == "4h" {
@@ -59,8 +59,8 @@ func (a *Aggregator) createIncompleteAggregatedRecord(records []binance.RecordDt
 	return aggregatedRecord
 }
 
-func (a *Aggregator) aggregate(group []binance.RecordDto, timeFrame string) *binance.RecordDto {
-	return &binance.RecordDto{
+func (a *Aggregator) aggregate(group []dto.RecordDto, timeFrame string) *dto.RecordDto {
+	return &dto.RecordDto{
 		Timeframe: timeFrame,
 		Symbol:    group[0].Symbol,
 		Timestamp: group[len(group)-1].Timestamp,
@@ -72,7 +72,7 @@ func (a *Aggregator) aggregate(group []binance.RecordDto, timeFrame string) *bin
 	}
 }
 
-func (a *Aggregator) maxHigh(group []binance.RecordDto) float64 {
+func (a *Aggregator) maxHigh(group []dto.RecordDto) float64 {
 	max := group[0].High
 	for _, data := range group {
 		if data.High > max {
@@ -82,7 +82,7 @@ func (a *Aggregator) maxHigh(group []binance.RecordDto) float64 {
 	return max
 }
 
-func (a *Aggregator) minLow(group []binance.RecordDto) float64 {
+func (a *Aggregator) minLow(group []dto.RecordDto) float64 {
 	min := group[0].Low
 	for _, data := range group {
 		if data.Low < min {
@@ -92,7 +92,7 @@ func (a *Aggregator) minLow(group []binance.RecordDto) float64 {
 	return min
 }
 
-func (a *Aggregator) totalVolume(group []binance.RecordDto) float64 {
+func (a *Aggregator) totalVolume(group []dto.RecordDto) float64 {
 	total := 0.0
 	for _, data := range group {
 		total += data.Volume
