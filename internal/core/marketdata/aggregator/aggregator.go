@@ -8,25 +8,25 @@ import (
 )
 
 type Aggregator struct {
-	indicator *indicator.Indicator
+	indicator *indicator.IndicatorService
 }
 
-func NewAggregator(indicator *indicator.Indicator) *Aggregator {
+func NewAggregator(indicator *indicator.IndicatorService) *Aggregator {
 	return &Aggregator{
 		indicator: indicator,
 	}
 }
-func (a *Aggregator) GroupRecords(records []dto.RecordDto, hoursInGroup int, timeframe string) ([]*dto.RecordDto, error) {
-	var aggregatedRecords []*dto.RecordDto
+func (a *Aggregator) GroupRecords(records []dto.DataDto, hoursInGroup int, timeframe string) ([]*dto.DataDto, error) {
+	var aggregatedRecords []*dto.DataDto
 	// Group 1-hour records into complete grouped records
-	tempGroup := make([]dto.RecordDto, 0, hoursInGroup)
+	tempGroup := make([]dto.DataDto, 0, hoursInGroup)
 	for i := 0; i < len(records); i++ {
 		tempGroup = append(tempGroup, records[i])
 		if records[i].Timestamp.Hour()%hoursInGroup == 0 {
 			if len(tempGroup) > 0 {
 				aggregatedRecord := a.createCompleteAggregatedRecord(tempGroup, timeframe)
 				aggregatedRecords = append(aggregatedRecords, aggregatedRecord)
-				tempGroup = make([]dto.RecordDto, 0, hoursInGroup)
+				tempGroup = make([]dto.DataDto, 0, hoursInGroup)
 			}
 		}
 	}
@@ -38,13 +38,13 @@ func (a *Aggregator) GroupRecords(records []dto.RecordDto, hoursInGroup int, tim
 	return aggregatedRecords, nil
 }
 
-func (a *Aggregator) createCompleteAggregatedRecord(records []dto.RecordDto, timeframe string) *dto.RecordDto {
+func (a *Aggregator) createCompleteAggregatedRecord(records []dto.DataDto, timeframe string) *dto.DataDto {
 	aggregatedRecord := a.aggregate(records, timeframe)
 	aggregatedRecord.Trend = a.indicator.Trend(aggregatedRecord)
 	aggregatedRecord.IsComplete = true
 	return aggregatedRecord
 }
-func (a *Aggregator) createIncompleteAggregatedRecord(records []dto.RecordDto, timeframe string) *dto.RecordDto {
+func (a *Aggregator) createIncompleteAggregatedRecord(records []dto.DataDto, timeframe string) *dto.DataDto {
 	aggregatedRecord := a.aggregate(records, timeframe)
 	recordTimestamp := aggregatedRecord.Timestamp
 	if timeframe == "4h" {
@@ -59,8 +59,8 @@ func (a *Aggregator) createIncompleteAggregatedRecord(records []dto.RecordDto, t
 	return aggregatedRecord
 }
 
-func (a *Aggregator) aggregate(group []dto.RecordDto, timeFrame string) *dto.RecordDto {
-	return &dto.RecordDto{
+func (a *Aggregator) aggregate(group []dto.DataDto, timeFrame string) *dto.DataDto {
+	return &dto.DataDto{
 		Timeframe: timeFrame,
 		Symbol:    group[0].Symbol,
 		Timestamp: group[len(group)-1].Timestamp,
@@ -72,7 +72,7 @@ func (a *Aggregator) aggregate(group []dto.RecordDto, timeFrame string) *dto.Rec
 	}
 }
 
-func (a *Aggregator) maxHigh(group []dto.RecordDto) float64 {
+func (a *Aggregator) maxHigh(group []dto.DataDto) float64 {
 	max := group[0].High
 	for _, data := range group {
 		if data.High > max {
@@ -82,7 +82,7 @@ func (a *Aggregator) maxHigh(group []dto.RecordDto) float64 {
 	return max
 }
 
-func (a *Aggregator) minLow(group []dto.RecordDto) float64 {
+func (a *Aggregator) minLow(group []dto.DataDto) float64 {
 	min := group[0].Low
 	for _, data := range group {
 		if data.Low < min {
@@ -92,7 +92,7 @@ func (a *Aggregator) minLow(group []dto.RecordDto) float64 {
 	return min
 }
 
-func (a *Aggregator) totalVolume(group []dto.RecordDto) float64 {
+func (a *Aggregator) totalVolume(group []dto.DataDto) float64 {
 	total := 0.0
 	for _, data := range group {
 		total += data.Volume

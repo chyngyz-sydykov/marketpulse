@@ -2,7 +2,7 @@ package dto
 
 import "time"
 
-type RecordDto struct {
+type DataDto struct {
 	Id         *int
 	Symbol     string
 	Timeframe  string

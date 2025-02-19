@@ -1,69 +1,114 @@
 package indicator
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
+	"github.com/chyngyz-sydykov/marketpulse/internal/core/validator"
 	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
-	"github.com/chyngyz-sydykov/marketpulse/internal/pkg/utils"
 )
 
-type Indicator struct {
+type IndicatorService struct {
 	repository IndicatorRepository
+	validator  validator.Validator
 	currency   string
 }
 
-func NewIndicator() *Indicator {
+func NewIndicatorService() *IndicatorService {
 	repository := NewIndicatorRepository()
-	return &Indicator{
+	validator := validator.NewValidator()
+	return &IndicatorService{
 		repository: *repository,
+		validator:  *validator,
 	}
 }
-func (service *Indicator) ComputeAndStoreByTimeframe(currency string, groupingTimeframe string) error {
-	return nil
-}
 
-func (service *Indicator) ComputeAndStore(currency string, history []dto.RecordDto) error {
-
-	service.currency = currency
-	fmt.Println("💡 Computing indicators...")
-	if len(history) == 0 {
-		log.Printf("%s", config.COLOR_YELLOW+"not enough data to calculate indicators"+config.COLOR_RESET)
-		return nil
+// StoreGroupedRecords
+func (service *IndicatorService) ComputeAndUpsertBatch(currency string, timeframe string) error {
+	if err := service.validator.ValidateCurrencyAndTimeframe(currency, timeframe); err != nil {
+		return err
 	}
-	indicatorDto := &dto.IndicatorDto{}
-	err := service.setMetadata(indicatorDto, history)
+
+	// 1. Get unprocessed market data
+	groupRecords, err := service.repository.GetUnprocessedMarketData(currency, timeframe)
+	fmt.Println("dataRecords: ", len(groupRecords), err)
 	if err != nil {
 		return err
 	}
-	exists, err := service.repository.checkIfRecordExistsByTimestampAndTimeframe(currency, indicatorDto)
-	if err != nil {
-		return err
-	}
-	if exists {
-		log.Printf(config.COLOR_YELLOW+"indicator already exists for %s %s %s\n"+config.COLOR_RESET, currency, indicatorDto.Timeframe, indicatorDto.Timestamp)
+	if len(groupRecords) == 0 {
+		log.Printf("%s", config.COLOR_YELLOW+"not data to calculate indicators"+config.COLOR_RESET)
 		return nil
 	}
 
+	//var indicatorList []dto.IndicatorDto
+	hoursInGroup := config.HoursByTimeframe[timeframe]
+	ctx := context.Background()
+
+	oneHourRecordsChan, err := service.repository.StreamOneHourRecords(ctx, "btc", "1h")
 	if err != nil {
-		return fmt.Errorf("indicator->setMetadata: %w", err)
-	}
-	err = service.CalculateAllIndicators(history, indicatorDto)
-	if err != nil {
-		return fmt.Errorf("indicator->CalculateAllIndicators: %w", err)
+		log.Fatalf("Failed to fetch 1H records: %v", err)
 	}
 
-	err = service.repository.storeData(currency, indicatorDto)
+	var indicators []*dto.IndicatorDto
+	for _, groupRecord := range groupRecords {
+		filtered1HRecords := service.filter1HRecords(groupRecord, oneHourRecordsChan, hoursInGroup)
+		fmt.Println("groupRecord: ", groupRecord.Timestamp, len(filtered1HRecords))
+		if len(filtered1HRecords) == 0 {
+			continue
+		}
+		for _, record := range filtered1HRecords {
+			fmt.Println("close: ", record.Close, record)
+		}
+
+		indicatorDto := &dto.IndicatorDto{}
+		service.setIndicatorMetadata(indicatorDto, groupRecord)
+		err = service.CalculateAllIndicators(filtered1HRecords, indicatorDto)
+		// TODO collect errors
+		if err != nil {
+			return fmt.Errorf("indicator->CalculateAllIndicators: %w", err)
+		} else {
+			indicators = append(indicators, indicatorDto)
+		}
+	}
+	if len(indicators) == 0 {
+		fmt.Println("nothing to upsert: ", err)
+		return nil
+	}
+
+	fmt.Println("indicators: ", len(indicators), indicators[0])
+
+	err = service.repository.upsertBatchByTimeFrame(currency, timeframe, indicators)
 	if err != nil {
-		return fmt.Errorf("indicator->storeData: %w", err)
+		fmt.Println("arrrrrrr: ", err)
+		return fmt.Errorf("indicator->upsertBatchByTimeFrame: %w", err)
 	}
 	return nil
+
 }
 
-func (service *Indicator) CalculateAllIndicators(history []dto.RecordDto, indicatorDto *dto.IndicatorDto) error {
+func (service *IndicatorService) filter1HRecords(record4H dto.DataDto, oneHourRecordsChan <-chan dto.DataDto, hoursInGroup int) []dto.DataDto {
+
+	startTime := record4H.Timestamp.Add(-1 * time.Duration(hoursInGroup) * time.Hour)
+	endTime := record4H.Timestamp
+
+	var filteredRecords []dto.DataDto
+	for record := range oneHourRecordsChan {
+		if record.Timestamp.After(startTime) && record.Timestamp.Before(endTime.Add(time.Hour)) {
+			filteredRecords = append(filteredRecords, record)
+		}
+		if record.Timestamp.Equal(endTime) {
+			return filteredRecords
+		}
+	}
+	return filteredRecords
+}
+
+func (service *IndicatorService) CalculateAllIndicators(history []dto.DataDto, indicatorDto *dto.IndicatorDto) error {
 	// Extract close prices from historical data
 	var closePrices []float64
 	var highPrices []float64
@@ -96,20 +141,13 @@ func (service *Indicator) CalculateAllIndicators(history []dto.RecordDto, indica
 	return nil
 }
 
-func (service *Indicator) setMetadata(indicatorDto *dto.IndicatorDto, history []dto.RecordDto) error {
-	nextTimeframe := utils.GetNextTimeframe(history[0].Timeframe)
-	if nextTimeframe == "" {
-		return fmt.Errorf("no next timeframe for %s", history[0].Timeframe)
-	}
-
-	lastTimestamp := history[len(history)-1].Timestamp
-	indicatorDto.Timeframe = nextTimeframe
-	indicatorDto.Timestamp = lastTimestamp
-	indicatorDto.DataTimestamp = lastTimestamp
-	return nil
+func (service *IndicatorService) setIndicatorMetadata(indicatorDto *dto.IndicatorDto, dataDto dto.DataDto) {
+	indicatorDto.Timeframe = dataDto.Timeframe
+	indicatorDto.Timestamp = dataDto.Timestamp
+	indicatorDto.DataTimestamp = dataDto.Timestamp
 }
 
-func (service *Indicator) SMA(prices []float64, indicatorDto *dto.IndicatorDto) {
+func (service *IndicatorService) SMA(prices []float64, indicatorDto *dto.IndicatorDto) {
 	period := len(prices)
 	sum := 0.0
 	for _, price := range prices {
@@ -119,7 +157,7 @@ func (service *Indicator) SMA(prices []float64, indicatorDto *dto.IndicatorDto) 
 }
 
 // Exponential Moving Average (EMA)
-func (service *Indicator) EMA(prices []float64, indicatorDto *dto.IndicatorDto, period int) {
+func (service *IndicatorService) EMA(prices []float64, indicatorDto *dto.IndicatorDto, period int) {
 	previousIndicator, err := service.repository.getLastRecord(service.currency, config.FOUR_HOUR)
 	if err != nil && err != sql.ErrNoRows {
 		return
@@ -136,7 +174,7 @@ func (service *Indicator) EMA(prices []float64, indicatorDto *dto.IndicatorDto, 
 }
 
 // Standard Deviation
-func (service *Indicator) StandardDeviation(prices []float64, indicatorDto *dto.IndicatorDto) {
+func (service *IndicatorService) StandardDeviation(prices []float64, indicatorDto *dto.IndicatorDto) {
 	mean := indicatorDto.SMA
 	sum := 0.0
 	for _, price := range prices {
@@ -145,12 +183,12 @@ func (service *Indicator) StandardDeviation(prices []float64, indicatorDto *dto.
 	indicatorDto.StdDev = math.Sqrt(sum / float64(len(prices)))
 }
 
-func (service *Indicator) Bollinger(indicatorDto *dto.IndicatorDto) {
+func (service *IndicatorService) Bollinger(indicatorDto *dto.IndicatorDto) {
 	indicatorDto.LowerBollinger = indicatorDto.SMA - 2*indicatorDto.StdDev
 	indicatorDto.UpperBollinger = indicatorDto.SMA + 2*indicatorDto.StdDev
 }
 
-func (service *Indicator) RSI(prices []float64, indicatorDto *dto.IndicatorDto) {
+func (service *IndicatorService) RSI(prices []float64, indicatorDto *dto.IndicatorDto) {
 	gain, loss := 0.0, 0.0
 	period := len(prices)
 	for i := 1; i < period; i++ {
@@ -184,9 +222,9 @@ func (service *Indicator) RSI(prices []float64, indicatorDto *dto.IndicatorDto) 
 // 	return indicator.EMA(macdValues, signalPeriod)
 // }
 
-func (service *Indicator) Trend(data *dto.RecordDto) float64 {
+func (service *IndicatorService) Trend(data *dto.DataDto) float64 {
 	return math.Round((data.Close-data.Open)/data.Open*10000) / 10000
 }
-func (service *Indicator) Volatility(highPrices []float64, lowPrices []float64, closePrices []float64, indicatorDto *dto.IndicatorDto) {
+func (service *IndicatorService) Volatility(highPrices []float64, lowPrices []float64, closePrices []float64, indicatorDto *dto.IndicatorDto) {
 	indicatorDto.Volatility = (highPrices[len(highPrices)-1] - lowPrices[len(lowPrices)-1]) / closePrices[len(highPrices)-1]
 }

@@ -3,7 +3,6 @@ package marketdata
 import (
 	"context"
 	"log"
-	"sync"
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/core/indicator"
@@ -16,14 +15,14 @@ import (
 type MarketDataService struct {
 	repository MarketDataRepository
 	aggregator aggregator.Aggregator
-	indicator  indicator.Indicator
+	indicator  indicator.IndicatorService
 	redis      redis.RedisServiceInterface
 	validator  validator.Validator
 }
 
 func NewMarketDataService(redis redis.RedisServiceInterface) *MarketDataService {
 	repository := NewMarketDataRepository()
-	indicator := indicator.NewIndicator()
+	indicator := indicator.NewIndicatorService()
 	aggregator := aggregator.NewAggregator(indicator)
 	validator := validator.NewValidator()
 	return &MarketDataService{
@@ -35,7 +34,7 @@ func NewMarketDataService(redis redis.RedisServiceInterface) *MarketDataService 
 	}
 }
 
-func (service *MarketDataService) StoreData(currency string, data *dto.RecordDto) error {
+func (service *MarketDataService) StoreData(currency string, data *dto.DataDto) error {
 	if err := service.validator.ValidateCurrencyAndTimeframe(currency, data.Timeframe); err != nil {
 		return err
 	}
@@ -56,11 +55,10 @@ func (service *MarketDataService) StoreData(currency string, data *dto.RecordDto
 		return err
 	}
 
-	// TODO PUBLISH EVENT
 	return service.publishEvent("NewRecordAdded")
 }
 
-func (service *MarketDataService) UpsertBatchData(currency string, data []*dto.RecordDto) error {
+func (service *MarketDataService) UpsertBatchData(currency string, data []*dto.DataDto) error {
 	timeFrame := data[0].Timeframe
 	if err := service.validator.ValidateCurrencyAndTimeframe(currency, timeFrame); err != nil {
 		return err
@@ -69,11 +67,16 @@ func (service *MarketDataService) UpsertBatchData(currency string, data []*dto.R
 	for _, record := range data {
 		record.Trend = service.indicator.Trend(record)
 	}
-	return service.repository.upsertBatchByTimeFrame(currency, timeFrame, data)
+
+	if err := service.repository.upsertBatchByTimeFrame(currency, timeFrame, data); err != nil {
+		return err
+	}
+
+	return service.publishEvent("NewRecordAdded")
 }
 
 func (service *MarketDataService) StoreGroupedRecords(currency string, groupingTimeframe string) error {
-	log.Printf(config.COLOR_BLUE+"grouping records cur:%s timeframe:%s"+config.COLOR_RESET, currency, groupingTimeframe)
+	log.Printf(config.COLOR_BLUE+"grouping records currency:%s timeframe:%s"+config.COLOR_RESET, currency, groupingTimeframe)
 	if err := service.validator.ValidateCurrencyAndTimeframe(currency, groupingTimeframe); err != nil {
 		return err
 	}
@@ -84,7 +87,7 @@ func (service *MarketDataService) StoreGroupedRecords(currency string, groupingT
 	}
 	hoursInGroup := config.HoursByTimeframe[groupingTimeframe]
 
-	var oneHourRecords []dto.RecordDto
+	var oneHourRecords []dto.DataDto
 	if lastCompleteGroupRecord == nil {
 		// No previous 4-hour record → Fetch all 1-hour records within the last 4-hour period
 		oneHourRecords, err = service.repository.getRecords(currency, config.ONE_HOUR) // Get all
@@ -118,21 +121,4 @@ func (service *MarketDataService) publishEvent(eventName string) error {
 	}
 	return nil
 
-}
-
-func (service *MarketDataService) calculateAndStoreIndicators(currency string, groupedRecords [][]dto.RecordDto) error {
-	var wg sync.WaitGroup
-	for i := 0; i < len(groupedRecords); i++ {
-		wg.Add(1)
-		go func(group []dto.RecordDto) {
-			defer wg.Done()
-
-			err := service.indicator.ComputeAndStore(currency, group)
-			if err != nil {
-				log.Printf(config.COLOR_RED+"Error computing indicators for %s: %v"+config.COLOR_RESET, currency, err)
-			}
-		}(groupedRecords[i])
-	}
-	wg.Wait()
-	return nil
 }

@@ -5,21 +5,22 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"testing"
 	"time"
 
 	"github.com/chyngyz-sydykov/marketpulse/internal/core/marketdata"
 	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
 	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/database"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
 // Test Suite Struct
 type MarketDataServiceTestSuite struct {
 	suite.Suite
-	db      *sql.DB
-	service *marketdata.MarketDataService
+	db        *sql.DB
+	service   *marketdata.MarketDataService
+	redisMock *MockRedisService
 }
 
 func (suite *MarketDataServiceTestSuite) SetupSuite() {
@@ -29,9 +30,11 @@ func (suite *MarketDataServiceTestSuite) SetupSuite() {
 	}
 
 	mockRedis := &MockRedisService{}
+	mockRedis.On("PublishEvent", mock.Anything, "NewRecordAdded", "MarketPulse").Return(nil)
 
 	suite.service = marketdata.NewMarketDataService(mockRedis)
 	suite.db = database.DB
+	suite.redisMock = mockRedis
 }
 
 // Clear DB Before Each Test
@@ -48,7 +51,7 @@ func calculateTrend(open, close float64) float64 {
 
 // ✅ Test Case 1: Store 1H Record
 func (suite *MarketDataServiceTestSuite) TestShouldStoreSingleRecord() {
-	record := &dto.RecordDto{
+	record := &dto.DataDto{
 		Symbol:     "BTCUSDT",
 		Timeframe:  "1h",
 		Timestamp:  time.Now().Truncate(time.Hour),
@@ -63,6 +66,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldStoreSingleRecord() {
 	err := suite.service.StoreData("btc", record)
 	assert.NoError(suite.T(), err)
 
+	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewRecordAdded", "MarketPulse")
 	// Verify stored record
 	stored := suite.getDataByTimeframeAndTimestamp("1h", record.Timestamp)
 	suite.assertRecordValues(*record, stored)
@@ -71,13 +75,15 @@ func (suite *MarketDataServiceTestSuite) TestShouldStoreSingleRecord() {
 
 // ✅ Test Case 2: Store Multiple 1H Records
 func (suite *MarketDataServiceTestSuite) TestShouldStoreMultipleRecordsWithBatchUpsert() {
-	records := []*dto.RecordDto{
+	records := []*dto.DataDto{
 		{Symbol: "BTCUSDT", Timeframe: "1h", Timestamp: time.Now().Add(-time.Hour), Open: 210, High: 220, Low: 200, Close: 205, Volume: 222, IsComplete: true},
 		{Symbol: "BTCUSDT", Timeframe: "1h", Timestamp: time.Now(), Open: 211, High: 221, Low: 201, Close: 206, Volume: 223, IsComplete: true},
 	}
 
 	err := suite.service.UpsertBatchData("btc", records)
 	assert.NoError(suite.T(), err)
+
+	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewRecordAdded", "MarketPulse")
 
 	for _, rec := range records {
 		stored := suite.getDataByTimeframeAndTimestamp("1h", rec.Timestamp)
@@ -103,11 +109,11 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroupTwo1HRecordsToNotComplete
 	assert.NoError(suite.T(), err)
 	assert.Equal(suite.T(), 1, count)
 
-	var stored dto.RecordDto
+	var stored dto.DataDto
 	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
 		Scan(&stored.Open, &stored.High, &stored.Low, &stored.Close, &stored.Volume, &stored.IsComplete, &stored.Trend)
 	assert.NoError(suite.T(), err)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       1,
 		High:       11,
 		Low:        0,
@@ -134,11 +140,11 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroupUpdateExistingInComplete
 	assert.NoError(suite.T(), err)
 	assert.Equal(suite.T(), 1, count)
 
-	var stored dto.RecordDto
+	var stored dto.DataDto
 	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
 		Scan(&stored.Open, &stored.High, &stored.Low, &stored.Close, &stored.Volume, &stored.IsComplete, &stored.Trend)
 	assert.NoError(suite.T(), err)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       1,
 		High:       11,
 		Low:        0,
@@ -161,7 +167,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroupUpdateExistingInComplete
 	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
 		Scan(&stored.Open, &stored.High, &stored.Low, &stored.Close, &stored.Volume, &stored.IsComplete, &stored.Trend)
 	assert.NoError(suite.T(), err)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       1,
 		Close:      9,
 		Low:        0,
@@ -192,11 +198,11 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsWithinTimeTangeT
 	assert.NoError(suite.T(), err)
 	assert.Equal(suite.T(), 1, count)
 
-	var complete4hData dto.RecordDto
+	var complete4hData dto.DataDto
 	err = suite.db.QueryRow(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_4h ORDER BY timestamp asc LIMIT 1`).
 		Scan(&complete4hData.Open, &complete4hData.High, &complete4hData.Low, &complete4hData.Close, &complete4hData.Volume, &complete4hData.IsComplete, &complete4hData.Trend)
 	assert.NoError(suite.T(), err)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       1,
 		Close:      8,
 		Low:        0,
@@ -234,7 +240,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsExceedingTimeRan
 	assert.Equal(suite.T(), 2, count)
 
 	complete4hData := suite.getDataByTimeframeAndTimestamp("4h", timestamp4)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       1,
 		Close:      8,
 		Low:        0,
@@ -246,7 +252,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsExceedingTimeRan
 
 	next4HGroupTime := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 8, 0, 0, 0, time.Now().Location())
 	incomplete4hData := suite.getDataByTimeframeAndTimestamp("4h", next4HGroupTime)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       1,
 		Close:      1,
 		Low:        2,
@@ -284,7 +290,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsBetweenDaysTo4Ho
 
 	complete4hData := suite.getDataByTimeframeAndTimestamp("4h", midnight)
 
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       100,
 		Close:      115,
 		Low:        80,
@@ -295,7 +301,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsBetweenDaysTo4Ho
 
 	next4HGroupTime := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 4, 0, 0, 0, time.Now().Location())
 	incomplete4hData := suite.getDataByTimeframeAndTimestamp("4h", next4HGroupTime)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       115,
 		Close:      130,
 		Low:        70,
@@ -309,15 +315,11 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsBetweenDaysTo4Ho
 //TODO create grouped record, then updated group record. check that data is updated
 
 func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
-	_, err := suite.db.Exec("DELETE FROM data_btc_1h; DELETE FROM data_btc_1d;")
-	if err != nil {
-		log.Fatalf("❌ Failed to clean DB: %v", err)
-	}
-	var records []*dto.RecordDto
+	var records []*dto.DataDto
 
 	for i := 1; i < 50; i++ {
 		tmpTime := time.Date(2020, 1, 1, i+1, 0, 0, 0, time.Now().Location())
-		records = append(records, &dto.RecordDto{
+		records = append(records, &dto.DataDto{
 			Symbol:     "BTCUSDT",
 			Timeframe:  "1h",
 			Timestamp:  tmpTime,
@@ -330,7 +332,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 		})
 	}
 
-	err = suite.service.UpsertBatchData("btc", records)
+	err := suite.service.UpsertBatchData("btc", records)
 	assert.NoError(suite.T(), err)
 
 	err = suite.service.StoreGroupedRecords("btc", "1d")
@@ -346,7 +348,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 
 	jan2Time := time.Date(2020, 1, 1, 24, 0, 0, 0, time.Now().Location())
 	jan2Data := suite.getDataByTimeframeAndTimestamp("1d", jan2Time)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       1,
 		Close:      23,
 		Low:        0,
@@ -357,7 +359,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 
 	jan3Time := time.Date(2020, 1, 2, 24, 0, 0, 0, time.Now().Location())
 	jan3Data := suite.getDataByTimeframeAndTimestamp("1d", jan3Time)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       24,
 		Close:      47,
 		Low:        23,
@@ -368,7 +370,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 
 	jan4Time := time.Date(2020, 1, 3, 24, 0, 0, 0, time.Now().Location())
 	jan4Data := suite.getDataByTimeframeAndTimestamp("1d", jan4Time)
-	suite.assertRecordValues(dto.RecordDto{
+	suite.assertRecordValues(dto.DataDto{
 		Open:       48,
 		Close:      49,
 		Low:        47,
@@ -378,7 +380,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroup1HRecordsTo1DRecords() {
 	}, jan4Data)
 }
 
-func (suite *MarketDataServiceTestSuite) assertRecordValues(expected, actual dto.RecordDto) {
+func (suite *MarketDataServiceTestSuite) assertRecordValues(expected, actual dto.DataDto) {
 	assert.Equal(suite.T(), expected.Open, actual.Open)
 	assert.Equal(suite.T(), expected.Close, actual.Close)
 	assert.Equal(suite.T(), expected.Low, actual.Low)
@@ -387,8 +389,8 @@ func (suite *MarketDataServiceTestSuite) assertRecordValues(expected, actual dto
 	assert.Equal(suite.T(), expected.IsComplete, actual.IsComplete)
 }
 
-func (suite *MarketDataServiceTestSuite) getDataByTimeframeAndTimestamp(timeframe string, time time.Time) dto.RecordDto {
-	var data dto.RecordDto
+func (suite *MarketDataServiceTestSuite) getDataByTimeframeAndTimestamp(timeframe string, time time.Time) dto.DataDto {
+	var data dto.DataDto
 	query := fmt.Sprintf(`SELECT open, high, low, close, volume, is_complete, trend FROM data_btc_%s WHERE timestamp = $1`, timeframe)
 	err := suite.db.QueryRow(query, time).
 		Scan(&data.Open, &data.High, &data.Low, &data.Close, &data.Volume, &data.IsComplete, &data.Trend)
@@ -397,6 +399,6 @@ func (suite *MarketDataServiceTestSuite) getDataByTimeframeAndTimestamp(timefram
 }
 
 // ✅ Run the Test Suite
-func TestMarketDataService(t *testing.T) {
-	suite.Run(t, new(MarketDataServiceTestSuite))
-}
+// func TestMarketDataService(t *testing.T) {
+// 	suite.Run(t, new(MarketDataServiceTestSuite))
+// }

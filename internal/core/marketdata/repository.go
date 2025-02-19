@@ -18,7 +18,7 @@ func NewMarketDataRepository() *MarketDataRepository {
 	return &MarketDataRepository{}
 }
 
-func (repository *MarketDataRepository) getRecords(currency string, timeframe string) ([]dto.RecordDto, error) {
+func (repository *MarketDataRepository) getRecords(currency string, timeframe string) ([]dto.DataDto, error) {
 	query := fmt.Sprintf(`SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume 
 						  FROM data_%s_%s ORDER BY timestamp ASC`, currency, timeframe)
 
@@ -28,10 +28,10 @@ func (repository *MarketDataRepository) getRecords(currency string, timeframe st
 	}
 	defer rows.Close()
 
-	var records []dto.RecordDto
+	var records []dto.DataDto
 
 	for rows.Next() {
-		var record dto.RecordDto
+		var record dto.DataDto
 		err := rows.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp,
 			&record.Open, &record.High, &record.Low, &record.Close, &record.Volume)
 		if err != nil {
@@ -47,7 +47,7 @@ func (repository *MarketDataRepository) getRecords(currency string, timeframe st
 	return records, nil
 }
 
-func (repository *MarketDataRepository) getCompleteRecordsAfter(currency string, timeframe string, lastTime time.Time) ([]dto.RecordDto, error) {
+func (repository *MarketDataRepository) getCompleteRecordsAfter(currency string, timeframe string, lastTime time.Time) ([]dto.DataDto, error) {
 	query := fmt.Sprintf(`SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume 
 						  FROM data_%s_%s 
 						  WHERE timestamp > $1 and is_complete = true
@@ -59,10 +59,10 @@ func (repository *MarketDataRepository) getCompleteRecordsAfter(currency string,
 	}
 	defer rows.Close()
 
-	var records []dto.RecordDto
+	var records []dto.DataDto
 
 	for rows.Next() {
-		var record dto.RecordDto
+		var record dto.DataDto
 		err := rows.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp,
 			&record.Open, &record.High, &record.Low, &record.Close, &record.Volume)
 		if err != nil {
@@ -78,7 +78,7 @@ func (repository *MarketDataRepository) getCompleteRecordsAfter(currency string,
 	return records, nil
 }
 
-func (repository *MarketDataRepository) getLastCompleteRecord(currency, timeframe string) (*dto.RecordDto, error) {
+func (repository *MarketDataRepository) getLastCompleteRecord(currency, timeframe string) (*dto.DataDto, error) {
 	query := fmt.Sprintf(`SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume 
 						  FROM data_%s_%s 
 						  WHERE is_complete = true
@@ -86,7 +86,7 @@ func (repository *MarketDataRepository) getLastCompleteRecord(currency, timefram
 
 	row := database.DB.QueryRow(query)
 
-	var record dto.RecordDto
+	var record dto.DataDto
 	err := row.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp,
 		&record.Open, &record.High, &record.Low, &record.Close, &record.Volume)
 
@@ -114,7 +114,7 @@ func (repository *MarketDataRepository) checkIfRecordExists(currency, timeframe 
 	return exists, nil
 }
 
-func (repository *MarketDataRepository) upsert(currency string, data *dto.RecordDto) error {
+func (repository *MarketDataRepository) upsert(currency string, data *dto.DataDto) error {
 	tx, err := database.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("💾 error starting transaction: %v", err)
@@ -149,7 +149,7 @@ func (repository *MarketDataRepository) upsert(currency string, data *dto.Record
 
 }
 
-func (repository *MarketDataRepository) upsertBatchByTimeFrame(currency string, timeFrame string, records []*dto.RecordDto) error {
+func (repository *MarketDataRepository) upsertBatchByTimeFrame(currency string, timeFrame string, records []*dto.DataDto) error {
 	if len(records) == 0 {
 		return nil
 	}

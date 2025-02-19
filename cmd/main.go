@@ -9,7 +9,7 @@ import (
 
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/app"
-	"github.com/chyngyz-sydykov/marketpulse/internal/app/scheduler"
+	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
 	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/binance"
 	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/database"
 	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/redis"
@@ -33,10 +33,28 @@ func main() {
 	app.NewContainer()
 
 	// Start the scheduler to fetch market data every hour
-	scheduler.StartScheduler()
+	//scheduler.StartScheduler()
 
-	startEventListeners()
 	//getAlotOfData()
+	//startEventListeners()
+
+	// for _, currency := range config.DefaultCurrencies {
+	// 	go func(curr string) {
+
+	// 		err := app.App.MarketDataService.StoreGroupedRecords(curr, config.FOUR_HOUR)
+	// 		if err != nil {
+	// 			log.Printf("Error storing records for %s: %v", curr, err)
+	// 		}
+
+	// 		err = app.App.MarketDataService.StoreGroupedRecords(curr, config.ONE_DAY)
+	// 		if err != nil {
+	// 			log.Printf("Error storing records for %s: %v", curr, err)
+	// 		}
+
+	// 		//indicatorService.ComputeAndStore(currency, config.FOUR_HOUR)
+
+	// 	}(currency)
+	// }
 
 	// get data from binance every hour
 	// save 1h data to db
@@ -66,12 +84,12 @@ func startEventListeners() {
 			go func(curr string) {
 				defer wg.Done()
 
-				err := app.App.MarketDataService.StoreGroupedRecords(curr, config.ONE_HOUR)
+				err := app.App.MarketDataService.StoreGroupedRecords(curr, config.FOUR_HOUR)
 				if err != nil {
 					log.Printf("Error storing records for %s: %v", curr, err)
 				}
 
-				err = app.App.MarketDataService.StoreGroupedRecords(curr, config.ONE_HOUR)
+				err = app.App.MarketDataService.StoreGroupedRecords(curr, config.ONE_DAY)
 				if err != nil {
 					log.Printf("Error storing records for %s: %v", curr, err)
 				}
@@ -111,4 +129,21 @@ func getAlotOfData() {
 	wg.Wait()
 	totalDuration := time.Since(startTime) // Measure total execution time
 	log.Printf("🚀 time: %v\n", totalDuration)
+}
+
+func calculateAndStoreIndicators(currency string, groupedRecords [][]dto.DataDto) error {
+	var wg sync.WaitGroup
+	for i := 0; i < len(groupedRecords); i++ {
+		wg.Add(1)
+		go func(group []dto.DataDto) {
+			defer wg.Done()
+
+			err := app.App.IndicatorService.ComputeAndUpsertBatch(currency, config.FOUR_HOUR)
+			if err != nil {
+				log.Printf(config.COLOR_RED+"Error computing indicators for %s: %v"+config.COLOR_RESET, currency, err)
+			}
+		}(groupedRecords[i])
+	}
+	wg.Wait()
+	return nil
 }
