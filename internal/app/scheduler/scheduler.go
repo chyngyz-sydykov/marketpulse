@@ -18,13 +18,13 @@ func StartScheduler() {
 	scheduler.Every(1).Hour().Do(func() {
 		log.Println("hourly scheduler...")
 		executeForAllCurrencies(func(currency string) {
-			records, err := binance.FetchKline(currency, config.ONE_HOUR, 1000)
+			records, err := binance.FetchKline(currency, config.ONE_HOUR, 100)
 			if err != nil {
 				log.Printf("Error fetching data for %s: %v\n", currency, err)
 				return
 			}
-			//err = app.App.MarketDataService.StoreData(currency, records[0])
-			err = app.App.MarketDataService.UpsertBatchData(currency, records)
+			err = app.App.MarketDataService.StoreData(currency, records[0])
+			//err = app.App.MarketDataService.UpsertBatchData(currency, records)
 			if err != nil {
 				log.Printf("%sError: %s %s\n", config.COLOR_RED, err, config.COLOR_RED)
 			}

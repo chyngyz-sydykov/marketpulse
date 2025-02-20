@@ -53,6 +53,7 @@ type Config struct {
 	RedisHost         string
 	RedisPort         string
 	RedisPassword     string
+	GrpcPort          string
 }
 
 // LoadConfig reads from .env and loads it into Config struct
@@ -75,6 +76,7 @@ func LoadConfig() *Config {
 		RedisHost:         getEnv("REDIS_HOST", "localhost"),
 		RedisPort:         getEnv("REDIS_PORT", "6379"),
 		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
+		GrpcPort:          getEnv("GRPC_PORT", "50051"),
 	}
 }
 

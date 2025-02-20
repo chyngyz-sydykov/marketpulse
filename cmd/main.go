@@ -11,6 +11,7 @@ import (
 	"github.com/chyngyz-sydykov/marketpulse/internal/app/scheduler"
 	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/binance"
 	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/database"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/grpc"
 	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/redis"
 )
 
@@ -35,6 +36,8 @@ func main() {
 	scheduler.StartScheduler()
 
 	app.App.EventListener.Listen()
+
+	go grpc.StartGRPCServer()
 
 	//getAlotOfData()
 
