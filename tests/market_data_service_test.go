@@ -67,7 +67,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldStoreSingleRecord() {
 	err := suite.service.StoreData("btc", record)
 	assert.NoError(suite.T(), err)
 
-	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewRecordAdded", "MarketPulse")
+	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewDataAdded", "MarketPulse")
 	// Verify stored record
 	stored := suite.getDataByTimeframeAndTimestamp("1h", record.Timestamp)
 	suite.assertRecordValues(*record, stored)
@@ -84,7 +84,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldStoreMultipleRecordsWithBatch
 	err := suite.service.UpsertBatchData("btc", records)
 	assert.NoError(suite.T(), err)
 
-	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewRecordAdded", "MarketPulse")
+	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewDataAdded", "MarketPulse")
 
 	for _, rec := range records {
 		stored := suite.getDataByTimeframeAndTimestamp("1h", rec.Timestamp)
@@ -102,7 +102,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroupTwo1HRecordsToNotComplete
 							 ('btc', '1h', $1, 1, 10, 1, 5, 1, true),
 							 ('btc', '1h', $2, 2, 11, 0, 6, 1, true)`, timestamp1, timestamp2)
 
-	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupRecordAdded", "MarketPulse")
+	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupDataAdded", "MarketPulse")
 	err := suite.service.StoreGroupedRecords("btc", "4h")
 	assert.NoError(suite.T(), err)
 
@@ -134,7 +134,7 @@ func (suite *MarketDataServiceTestSuite) TestShouldGroupUpdateExistingInComplete
 							 ('btc', '1h', $1, 1, 10, 1, 5, 1, true),
 							 ('btc', '1h', $2, 2, 11, 0, 6, 1, true)`, timestamp1, timestamp2)
 
-	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupRecordAdded", "MarketPulse")
+	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupDataAdded", "MarketPulse")
 	err := suite.service.StoreGroupedRecords("btc", "4h")
 	assert.NoError(suite.T(), err)
 
@@ -193,7 +193,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsWithinTimeTangeT
 							 ('btc', '1h', $3, 6, 7, 9, 0, 1, true),
 							 ('btc', '1h', $4, 7, 8, 8, 3, 1, true)`, timestamp1, timestamp2, timestamp3, timestamp4)
 
-	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupRecordAdded", "MarketPulse")
+	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupDataAdded", "MarketPulse")
 	err := suite.service.StoreGroupedRecords("btc", "4h")
 	assert.NoError(suite.T(), err)
 
@@ -234,7 +234,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsExceedingTimeRan
 							 ('btc', '1h', $5, 1, 6, 9, 2, 1, true),
 							 ('btc', '1h', $6, 6, 1, 11, 3, 1, true)`,
 		timestamp1, timestamp2, timestamp3, timestamp4, timestamp5, timestamp6)
-	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupRecordAdded", "MarketPulse")
+	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupDataAdded", "MarketPulse")
 	err := suite.service.StoreGroupedRecords("btc", "4h")
 	assert.NoError(suite.T(), err)
 
@@ -284,7 +284,7 @@ func (suite *MarketDataServiceTestSuite) TestShoulGroup1HRecordsBetweenDaysTo4Ho
 							 ('btc', '1h', $6, 125, 130, 135, 120, 35, true)`,
 		timestamp1, timestamp2, midnight, timestamp4, timestamp5, timestamp6)
 	err := suite.service.StoreGroupedRecords("btc", "4h")
-	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupRecordAdded", "MarketPulse")
+	suite.redisMock.AssertCalled(suite.T(), "PublishEvent", mock.Anything, "NewGroupDataAdded", "MarketPulse")
 	assert.NoError(suite.T(), err)
 
 	var count int

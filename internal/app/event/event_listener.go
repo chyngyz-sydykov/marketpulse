@@ -32,7 +32,7 @@ func (el *EventListener) Listen() {
 
 	ctx := context.Background()
 
-	el.subscribeToEvent(ctx, config.EVENT_NEW_RECORD_ADDED, func(currency, eventName, source string) {
+	el.subscribeToEvent(ctx, config.EVENT_NEW_DATA_ADDED, func(currency, eventName, source string) {
 		err := el.MarketDataService.StoreGroupedRecords(currency, config.FOUR_HOUR)
 		if err != nil {
 			log.Printf("Error storing 4H records for %s: %v", currency, err)
@@ -43,7 +43,7 @@ func (el *EventListener) Listen() {
 			log.Printf("Error storing 1D records for %s: %v", currency, err)
 		}
 	})
-	el.subscribeToEvent(ctx, config.EVENT_NEW_GROUP_RECORD_ADDED, func(currency, eventName, eventSource string) {
+	el.subscribeToEvent(ctx, config.EVENT_NEW_GROUP_DATA_ADDED, func(currency, eventName, eventSource string) {
 		err := el.IndicatorService.ComputeAndUpsertBatch(currency, config.FOUR_HOUR)
 		if err != nil {
 			log.Printf("Error Indicator for 4H records %s: %v", currency, err)

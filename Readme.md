@@ -18,14 +18,21 @@ Aggregates data over different timeframes (daily, weekly, monthly).
  - if everything is ok, please console
 
 # Migration
-run migration `docker run --rm -v $(pwd)/migrations:/migrations --network=host migrate/migrate -path=/migrations -database "postgres://postgres:password@localhost:5402/marketpulse_db?sslmode=disable" up`
+run migration `make migrate-up`
 
-revert migration `docker run --rm -v $(pwd)/migrations:/migrations --network=host migrate/migrate -path=/migrations -database "postgres://postgres:password@localhost:5402/marketpulse_db?sslmode=disable" down 1`
+revert migration `make migrate-down`
 
-force migration `docker run --rm -v $(pwd)/migrations:/migrations --network=host migrate/migrate -path=/migrations -database "postgres://postgres:password@localhost:5402/marketpulse_db?sslmode=disable" force 1`
+create migration ``make migrate-new name=add_column_phone`
 
+# GRPC
 
-create migration `docker run --rm -v $(pwd)/migrations:/migrations --network=host migrate/migrate create -ext sql -dir /migrations -seq add_column_phone`
+the protobuf files are stored in different repo https://github.com/chyngyz-sydykov/crypto-bot-protoc and it is imported via following command.
+
+generate grpc files `docker exec -it marketpulse bash -c ".scripts/generate_protoc.sh"`
+
+check if the service is registered `grpcurl -plaintext localhost:50051 list`. you should see the following in the console `rating.RatingService` 
+Call a Specific Method
+`grpcurl -plaintext -d '{"book_id": 123}' localhost:50051 rating.RatingService.GetRatings`
 
 # Testing
 

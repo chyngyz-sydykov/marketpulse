@@ -3,5 +3,6 @@
 /.vscode
 /tmp
 /coverage
+/proto
 .env
 .env.test

@@ -2,7 +2,7 @@
 FROM golang:1.23-alpine
 
 # Install dependencies
-RUN apk add --no-cache git bash postgresql-client protoc
+RUN apk add --no-cache git bash postgresql-client protoc protobuf-dev
 RUN go env -w GOFLAGS=-buildvcs=false
 
 WORKDIR /app
@@ -15,14 +15,9 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest \
     && go install github.com/air-verse/air@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest
 
-# Set the Current Working Directory inside the container
-
-
-# RUN adduser -D -g '' golang
-# RUN mkdir -p /app && chown -R golang:golang /app /go/pkg/mod
-# WORKDIR /app
-# USER golang
-# COPY --chown=golang:golang . .
+# Ensure Google Well-Known Types are present
+RUN mkdir -p /usr/local/include/google && \
+    cp -r /usr/include/google/protobuf /usr/local/include/google/
 
 EXPOSE 8000 40000
 

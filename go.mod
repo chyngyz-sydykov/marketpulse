@@ -5,6 +5,7 @@ go 1.23.2
 require (
 	github.com/Jeffail/tunny v0.1.4 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/chyngyz-sydykov/crypto-bot-protos v0.0.0-20250220120537-10548709097c // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/go-co-op/gocron v1.37.0 // indirect

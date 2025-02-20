@@ -55,7 +55,7 @@ func (service *MarketDataService) StoreData(currency string, data *dto.DataDto) 
 		return err
 	}
 
-	return service.publishEvent(config.EVENT_NEW_RECORD_ADDED)
+	return service.publishEvent(config.EVENT_NEW_DATA_ADDED)
 }
 
 func (service *MarketDataService) UpsertBatchData(currency string, data []*dto.DataDto) error {
@@ -76,7 +76,7 @@ func (service *MarketDataService) UpsertBatchData(currency string, data []*dto.D
 		return err
 	}
 
-	return service.publishEvent(config.EVENT_NEW_RECORD_ADDED)
+	return service.publishEvent(config.EVENT_NEW_DATA_ADDED)
 }
 
 func (service *MarketDataService) StoreGroupedRecords(currency string, groupingTimeframe string) error {
@@ -114,7 +114,7 @@ func (service *MarketDataService) StoreGroupedRecords(currency string, groupingT
 			return err
 		}
 	}
-	return service.publishEvent(config.EVENT_NEW_GROUP_RECORD_ADDED)
+	return service.publishEvent(config.EVENT_NEW_GROUP_DATA_ADDED)
 }
 
 func (service *MarketDataService) publishEvent(eventName string) error {
