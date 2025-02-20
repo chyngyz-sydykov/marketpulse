@@ -11,32 +11,36 @@ import (
 	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/core/validator"
 	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
+	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/redis"
 )
 
 type IndicatorService struct {
 	repository IndicatorRepository
 	validator  validator.Validator
+	redis      redis.RedisServiceInterface
 	currency   string
 }
 
-func NewIndicatorService() *IndicatorService {
+func NewIndicatorService(redis redis.RedisServiceInterface) *IndicatorService {
 	repository := NewIndicatorRepository()
 	validator := validator.NewValidator()
 	return &IndicatorService{
 		repository: *repository,
 		validator:  *validator,
+		redis:      redis,
 	}
 }
 
 // StoreGroupedRecords
 func (service *IndicatorService) ComputeAndUpsertBatch(currency string, timeframe string) error {
+	log.Printf(config.COLOR_BLUE+"computing indicator for currency:%s timeframe:%s"+config.COLOR_RESET, currency, timeframe)
 	if err := service.validator.ValidateCurrencyAndTimeframe(currency, timeframe); err != nil {
 		return err
 	}
+	service.currency = currency
 
 	// 1. Get unprocessed market data
 	groupRecords, err := service.repository.GetUnprocessedMarketData(currency, timeframe)
-	fmt.Println("dataRecords: ", len(groupRecords), err)
 	if err != nil {
 		return err
 	}
@@ -51,20 +55,15 @@ func (service *IndicatorService) ComputeAndUpsertBatch(currency string, timefram
 
 	oneHourRecordsChan, err := service.repository.StreamOneHourRecords(ctx, "btc", "1h")
 	if err != nil {
-		log.Fatalf("Failed to fetch 1H records: %v", err)
+		return fmt.Errorf("indicator->StreamOneHourRecords: %w", err)
 	}
 
 	var indicators []*dto.IndicatorDto
 	for _, groupRecord := range groupRecords {
 		filtered1HRecords := service.filter1HRecords(groupRecord, oneHourRecordsChan, hoursInGroup)
-		fmt.Println("groupRecord: ", groupRecord.Timestamp, len(filtered1HRecords))
 		if len(filtered1HRecords) == 0 {
 			continue
 		}
-		for _, record := range filtered1HRecords {
-			fmt.Println("close: ", record.Close, record)
-		}
-
 		indicatorDto := &dto.IndicatorDto{}
 		service.setIndicatorMetadata(indicatorDto, groupRecord)
 		err = service.CalculateAllIndicators(filtered1HRecords, indicatorDto)
@@ -76,18 +75,15 @@ func (service *IndicatorService) ComputeAndUpsertBatch(currency string, timefram
 		}
 	}
 	if len(indicators) == 0 {
-		fmt.Println("nothing to upsert: ", err)
+		log.Printf("%s", config.COLOR_YELLOW+"no indicators to upsert"+config.COLOR_RESET)
 		return nil
 	}
 
-	fmt.Println("indicators: ", len(indicators), indicators[0])
-
 	err = service.repository.upsertBatchByTimeFrame(currency, timeframe, indicators)
 	if err != nil {
-		fmt.Println("arrrrrrr: ", err)
 		return fmt.Errorf("indicator->upsertBatchByTimeFrame: %w", err)
 	}
-	return nil
+	return service.publishEvent("NewIndicatorAdded")
 
 }
 
@@ -227,4 +223,13 @@ func (service *IndicatorService) Trend(data *dto.DataDto) float64 {
 }
 func (service *IndicatorService) Volatility(highPrices []float64, lowPrices []float64, closePrices []float64, indicatorDto *dto.IndicatorDto) {
 	indicatorDto.Volatility = (highPrices[len(highPrices)-1] - lowPrices[len(lowPrices)-1]) / closePrices[len(highPrices)-1]
+}
+
+func (service *IndicatorService) publishEvent(eventName string) error {
+	ctx := context.Background()
+	err := service.redis.PublishEvent(ctx, eventName, config.SERVICE_NAME)
+	if err != nil {
+		return err
+	}
+	return nil
 }

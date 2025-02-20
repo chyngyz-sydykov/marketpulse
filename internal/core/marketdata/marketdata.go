@@ -22,7 +22,7 @@ type MarketDataService struct {
 
 func NewMarketDataService(redis redis.RedisServiceInterface) *MarketDataService {
 	repository := NewMarketDataRepository()
-	indicator := indicator.NewIndicatorService()
+	indicator := indicator.NewIndicatorService(redis)
 	aggregator := aggregator.NewAggregator(indicator)
 	validator := validator.NewValidator()
 	return &MarketDataService{
@@ -55,13 +55,17 @@ func (service *MarketDataService) StoreData(currency string, data *dto.DataDto) 
 		return err
 	}
 
-	return service.publishEvent("NewRecordAdded")
+	return service.publishEvent(config.EVENT_NEW_RECORD_ADDED)
 }
 
 func (service *MarketDataService) UpsertBatchData(currency string, data []*dto.DataDto) error {
 	timeFrame := data[0].Timeframe
 	if err := service.validator.ValidateCurrencyAndTimeframe(currency, timeFrame); err != nil {
 		return err
+	}
+
+	if len(data) == 0 {
+		return nil
 	}
 
 	for _, record := range data {
@@ -72,7 +76,7 @@ func (service *MarketDataService) UpsertBatchData(currency string, data []*dto.D
 		return err
 	}
 
-	return service.publishEvent("NewRecordAdded")
+	return service.publishEvent(config.EVENT_NEW_RECORD_ADDED)
 }
 
 func (service *MarketDataService) StoreGroupedRecords(currency string, groupingTimeframe string) error {
@@ -110,7 +114,7 @@ func (service *MarketDataService) StoreGroupedRecords(currency string, groupingT
 			return err
 		}
 	}
-	return nil
+	return service.publishEvent(config.EVENT_NEW_GROUP_RECORD_ADDED)
 }
 
 func (service *MarketDataService) publishEvent(eventName string) error {
@@ -120,5 +124,4 @@ func (service *MarketDataService) publishEvent(eventName string) error {
 		return err
 	}
 	return nil
-
 }

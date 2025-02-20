@@ -150,10 +150,6 @@ func (repository *MarketDataRepository) upsert(currency string, data *dto.DataDt
 }
 
 func (repository *MarketDataRepository) upsertBatchByTimeFrame(currency string, timeFrame string, records []*dto.DataDto) error {
-	if len(records) == 0 {
-		return nil
-	}
-
 	tx, err := database.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("💾 error starting transaction: %v", err)
@@ -182,7 +178,7 @@ func (repository *MarketDataRepository) upsertBatchByTimeFrame(currency string, 
 			is_complete = EXCLUDED.is_complete;`,
 		currency, timeFrame, strings.Join(placeholders, ","))
 
-	_, err = tx.Exec(query, values...)
+	result, err := tx.Exec(query, values...)
 
 	if err != nil {
 		tx.Rollback()
@@ -193,7 +189,8 @@ func (repository *MarketDataRepository) upsertBatchByTimeFrame(currency string, 
 	if err != nil {
 		return fmt.Errorf("💾 error committing transaction: %v", err)
 	}
+	rowsAffected, _ := result.RowsAffected()
 
-	log.Println("💾 ✅ upsert batch successfully!")
+	log.Printf("💾 ✅ upsert batch data %d, %d", len(records), rowsAffected)
 	return nil
 }

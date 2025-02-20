@@ -17,6 +17,11 @@ var HoursByTimeframe = map[string]int{
 	"7d":  168,
 	"30d": 30 * 24, // TODO assuming 1 month is 30 days
 }
+
+var EVENT_NEW_RECORD_ADDED = "NewRecordAdded"
+var EVENT_NEW_GROUP_RECORD_ADDED = "NewGroupRecordAdded"
+var EVENT_NEW_INDICATOR_ADDED = "NewIndicatorAdded"
+
 var ONE_HOUR = "1h"
 var FOUR_HOUR = "4h"
 var ONE_DAY = "1d"

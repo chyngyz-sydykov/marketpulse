@@ -51,8 +51,6 @@ func (r *RedisService) PublishEvent(ctx context.Context, eventName, source strin
 	if err != nil {
 		return fmt.Errorf("failed to publish event: %w", err)
 	}
-
-	fmt.Printf("Published event: %s\n", eventData)
 	return nil
 }
 

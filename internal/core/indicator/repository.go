@@ -5,10 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"slices"
 	"strings"
 
-	"github.com/chyngyz-sydykov/marketpulse/config"
 	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
 	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/database"
 )
@@ -76,19 +74,7 @@ func (repository *IndicatorRepository) StreamOneHourRecords(ctx context.Context,
 
 		for rows.Next() {
 			var record dto.DataDto
-			err := rows.Scan(
-				&record.Id,
-				&record.Symbol,
-				&record.Timeframe,
-				&record.Timestamp,
-				&record.Open,
-				&record.Close,
-				&record.Low,
-				&record.High,
-				&record.Volume,
-				&record.Trend,
-				&record.IsComplete,
-			)
+			err := rows.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp, &record.Open, &record.Close, &record.Low, &record.High, &record.Volume, &record.Trend, &record.IsComplete)
 			if err == nil {
 				dataChan <- record
 			}
@@ -97,6 +83,7 @@ func (repository *IndicatorRepository) StreamOneHourRecords(ctx context.Context,
 
 	return dataChan, nil
 }
+
 func (repository *IndicatorRepository) getLastRecord(currency, timeframe string) (*dto.IndicatorDto, error) {
 	query := fmt.Sprintf(`SELECT timeframe, timestamp, sma, ema, std_dev, lower_bollinger, upper_bollinger, volatility, rsi, macd, macd_signal, data_timestamp 
 						  FROM indicator_%s_%s ORDER BY timestamp DESC LIMIT 1`, currency, timeframe)
@@ -116,37 +103,6 @@ func (repository *IndicatorRepository) getLastRecord(currency, timeframe string)
 	return &record, nil
 }
 
-func (repository *IndicatorRepository) storeData(currency string, data *dto.IndicatorDto) error {
-	//TODO should this be here?
-	if !slices.Contains(config.DefaultCurrencies, currency) {
-		return fmt.Errorf("unknown currency: %s", currency)
-	} else {
-		tx, err := database.DB.Begin()
-		if err != nil {
-			log.Println("💾 Error starting transaction:", err)
-			return err
-		}
-
-		query := `INSERT INTO indicator_` + currency + ` (timeframe, timestamp, sma, ema, std_dev, lower_bollinger, upper_bollinger, volatility, rsi, macd, macd_signal, data_timestamp) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
-		_, err = tx.Exec(query, data.Timeframe, data.Timestamp, data.SMA, data.EMA, data.StdDev, data.LowerBollinger, data.UpperBollinger, data.Volatility, data.RSI, data.MACD, data.MACDSignal, data.DataTimestamp)
-
-		if err != nil {
-			tx.Rollback() // Rollback transaction if insert fails
-			log.Println("💾 Error inserting indicator:", err)
-			return err
-		}
-		err = tx.Commit() // Commit transaction
-		if err != nil {
-			log.Println("💾 Error committing transaction:", err)
-			return err
-		}
-
-		log.Println("💾 ✅ indicator stored successfully!")
-		return nil
-	}
-}
-
 func (repository *IndicatorRepository) upsertBatchByTimeFrame(currency string, timeFrame string, records []*dto.IndicatorDto) error {
 	tx, err := database.DB.Begin()
 	if err != nil {
@@ -157,7 +113,6 @@ func (repository *IndicatorRepository) upsertBatchByTimeFrame(currency string, t
 	var placeholders []string
 
 	for i, record := range records {
-		fmt.Println("record", record.Timestamp)
 		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
 			i*12+1, i*12+2, i*12+3, i*12+4, i*12+5, i*12+6, i*12+7, i*12+8, i*12+9, i*12+10, i*12+11, i*12+12))
 		values = append(values, record.Timeframe, record.Timestamp, record.SMA, record.EMA, record.StdDev, record.LowerBollinger, record.UpperBollinger, record.Volatility, record.RSI, record.MACD, record.MACDSignal, record.DataTimestamp)
@@ -179,7 +134,7 @@ func (repository *IndicatorRepository) upsertBatchByTimeFrame(currency string, t
 			data_timestamp = EXCLUDED.data_timestamp
 	`, currency, timeFrame, strings.Join(placeholders, ","))
 
-	_, err = tx.Exec(query, values...)
+	result, err := tx.Exec(query, values...)
 
 	if err != nil {
 		tx.Rollback()
@@ -190,7 +145,8 @@ func (repository *IndicatorRepository) upsertBatchByTimeFrame(currency string, t
 	if err != nil {
 		return fmt.Errorf("💾 error committing transaction: %v", err)
 	}
+	rowsAffected, _ := result.RowsAffected()
 
-	log.Println("💾 ✅ upsert batch successfully!")
+	log.Printf("💾 ✅ upsert batch indicator %d, %d", len(records), rowsAffected)
 	return nil
 }
