@@ -34,6 +34,13 @@ func NewMarketDataService(redis redis.RedisServiceInterface) *MarketDataService 
 	}
 }
 
+func (service *MarketDataService) GetRecordsByRequest(ohlcRequestDto dto.OHLCRequestDto) ([]dto.DataDto, error) {
+	if err := service.validator.ValidateCurrencyAndTimeframe(ohlcRequestDto.Currency, ohlcRequestDto.Timeframe); err != nil {
+		return nil, err
+	}
+	return service.repository.GetRecordsByRequest(ohlcRequestDto)
+}
+
 func (service *MarketDataService) StoreData(currency string, data *dto.DataDto) error {
 	if err := service.validator.ValidateCurrencyAndTimeframe(currency, data.Timeframe); err != nil {
 		return err

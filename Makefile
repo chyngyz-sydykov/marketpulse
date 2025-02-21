@@ -39,9 +39,14 @@ migrate-fix:
 migrate-new:
 	docker run --rm -v $(MIGRATION_PATH):/migrations --network=host $(MIGRATE_IMAGE) create -ext sql -dir /migrations -seq $(name)
 
+# Generate Protobuf files
+protobuf-gen:
+	docker exec -it marketpulse bash -c "scripts/generate_protoc.sh"
 # Run Tests
 test:
 	docker exec -it marketpulse bash -c "APP_ENV=test go test -count=1 ./tests -v"
+test-suite:
+	docker exec -it marketpulse bash -c "APP_ENV=test go test -run $(name) -count=1 ./tests -v "
 
 # Run Code Linting
 lint:
@@ -78,8 +83,10 @@ help:
 	@echo "  migrate-up      Apply database migrations"
 	@echo "  migrate-down    Rollback last migration"
 	@echo "  migrate-fix     Force dirty migration"
-	@echo "  migrate-new   Create a new migration file (use name=<name>)"
+	@echo "  migrate-new   	 Create a new migration file (use name=<name>)"
+	@echo "  protobuf-gen    Pull remote protoc document and generates protobuf files"
 	@echo "  test            Run all tests"
+	@echo "  test-suite      Run speficic test suite (use name=<name>) ex: make test-suite name=TestGrpcServer"
 	@echo "  lint            Run code linting"
 	@echo "  fmt             Format Go code"
 	@echo "  clean-docker    Clean up unused Docker objects"

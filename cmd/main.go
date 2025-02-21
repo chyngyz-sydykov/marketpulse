@@ -37,7 +37,7 @@ func main() {
 
 	app.App.EventListener.Listen()
 
-	go grpc.StartGRPCServer()
+	go grpc.StartGRPCServer(app.App.GrpcServer)
 
 	//getAlotOfData()
 

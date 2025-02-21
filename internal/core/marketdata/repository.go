@@ -47,6 +47,54 @@ func (repository *MarketDataRepository) getRecords(currency string, timeframe st
 	return records, nil
 }
 
+func (repository *MarketDataRepository) GetRecordsByRequest(request dto.OHLCRequestDto) ([]dto.DataDto, error) {
+	query := fmt.Sprintf(`
+	SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume, trend, is_complete 
+	FROM data_%s_%s`, request.Currency, request.Timeframe)
+
+	var args []any
+
+	if request.StartTime != nil {
+		query += " WHERE timestamp >= $1"
+		args = append(args, request.StartTime)
+	}
+	if request.EndTime != nil {
+		if request.StartTime == nil {
+			query += " WHERE timestamp <= $1"
+			args = append(args, request.EndTime)
+		} else {
+			query += " AND timestamp <= $2"
+			args = append(args, request.EndTime)
+		}
+	}
+	query += fmt.Sprintf(` 
+	ORDER BY %s %s
+	LIMIT %d`, request.SortField, request.SortOrder, request.Limit)
+	rows, err := database.DB.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("💾 error fetching data: %v", err)
+	}
+	defer rows.Close()
+
+	var records []dto.DataDto
+
+	for rows.Next() {
+		var record dto.DataDto
+		err := rows.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp,
+			&record.Open, &record.High, &record.Low, &record.Close, &record.Volume, &record.Trend, &record.IsComplete)
+		if err != nil {
+			return nil, fmt.Errorf("💾 error scanning row: %v", err)
+		}
+		records = append(records, record)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("💾 error iterating rows: %v", err)
+	}
+
+	return records, nil
+}
+
 func (repository *MarketDataRepository) getCompleteRecordsAfter(currency string, timeframe string, lastTime time.Time) ([]dto.DataDto, error) {
 	query := fmt.Sprintf(`SELECT id, symbol, timeframe, timestamp, open, high, low, close, volume 
 						  FROM data_%s_%s 

@@ -1,6 +1,18 @@
 package dto
 
-import "time"
+import (
+	"time"
+)
+
+type OHLCRequestDto struct {
+	Currency  string
+	Timeframe string
+	StartTime *time.Time
+	EndTime   *time.Time
+	Limit     int32
+	SortField string
+	SortOrder string
+}
 
 type DataDto struct {
 	Id         *int
