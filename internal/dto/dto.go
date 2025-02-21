@@ -14,6 +14,16 @@ type OHLCRequestDto struct {
 	SortOrder string
 }
 
+type IndicatorRequestDto struct {
+	Currency  string
+	Timeframe string
+	StartTime *time.Time
+	EndTime   *time.Time
+	Limit     int32
+	SortField string
+	SortOrder string
+}
+
 type DataDto struct {
 	Id         *int
 	Symbol     string

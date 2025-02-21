@@ -48,14 +48,13 @@ func (suite *GrpcTestSuite) SetupSuite() {
 
 // Clear DB Before Each Test
 func (suite *GrpcTestSuite) SetupTest() {
-	_, err := suite.db.Exec("DELETE FROM data_btc_1h; DELETE FROM data_btc_4h; DELETE FROM data_btc_1d;")
+	_, err := suite.db.Exec("DELETE FROM data_btc; DELETE FROM indicator_btc;")
 	if err != nil {
 		log.Fatalf("❌ Failed to clean DB: %v", err)
 	}
 }
 
-// ✅ Test Case 1: Store 1H Record
-func (suite *GrpcTestSuite) TestGrpcShouldReturnCorrectData() {
+func (suite *GrpcTestSuite) TestGrpcMarketDataEndpointShouldReturnCorrectData() {
 	records := []*dto.DataDto{
 		{Symbol: "BTCUSDT", Timeframe: "1h", Timestamp: time.Date(2020, 1, 1, 1, 0, 0, 0, time.Now().Location()), Open: 110, High: 120, Low: 100, Close: 105, Volume: 111, Trend: -0.005, IsComplete: true},
 		{Symbol: "BTCUSDT", Timeframe: "1h", Timestamp: time.Date(2022, 1, 1, 1, 0, 0, 0, time.Now().Location()), Open: 211, High: 221, Low: 201, Close: 206, Volume: 223, IsComplete: true},
@@ -158,7 +157,103 @@ func (suite *GrpcTestSuite) TestGrpcShouldReturnCorrectData() {
 			}
 		})
 	}
+}
 
+func (suite *GrpcTestSuite) TestGrpcIndicatorEndpointShouldReturnCorrectData() {
+	// Arrange: Insert mock indicator data
+	records := []*dto.DataDto{
+		{Symbol: "BTCUSDT", Timeframe: "4h", Timestamp: time.Date(2020, 1, 1, 4, 0, 0, 0, time.Now().Location()), Open: 110, High: 120, Low: 100, Close: 105, Volume: 111, Trend: -0.005, IsComplete: true},
+		{Symbol: "BTCUSDT", Timeframe: "4h", Timestamp: time.Date(2020, 1, 1, 8, 0, 0, 0, time.Now().Location()), Open: 211, High: 221, Low: 201, Close: 206, Volume: 223, IsComplete: true},
+	}
+
+	suite.marketDataService.UpsertBatchData("btc", records)
+
+	_, err := suite.db.Exec(`INSERT INTO indicator_btc_4h (timeframe, timestamp,data_timestamp, sma, ema, std_dev, lower_bollinger, upper_bollinger, rsi, volatility, macd, macd_signal) VALUES 
+	('4h', '2020-01-01 04:00:00', '2020-01-01 04:00:00', 105, 107, 2.5, 100, 110, 45, 0.03, 0.5, 0.3),
+	('4h', '2020-01-01 08:00:00', '2020-01-01 08:00:00', 205, 207, 3.1, 200, 210, 50, 0.02, 0.6, 0.4)`)
+	if err != nil {
+		log.Fatalf("Failed to insert mock indicator data: %v", err)
+	}
+	listener, server := createInMemoryGrpcServer(suite)
+	defer server.Stop()
+
+	// Create gRPC client
+	conn, err := grpc.Dial(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to dial server: %v", err)
+	}
+	defer conn.Close()
+
+	client := pb.NewMarketPulseClient(conn)
+
+	// ✅ Define test cases
+	testCases := []struct {
+		name       string
+		request    *pb.IndicatorRequest
+		expectLen  int
+		expectData *pb.IndicatorResponse
+		expectErr  string
+	}{
+		{
+			name:      "Fetch 4H indicator data with end time filter",
+			request:   &pb.IndicatorRequest{Currency: "btc", Timeframe: "4h", EndTime: timestamppb.New(time.Date(2020, 1, 1, 6, 0, 0, 0, time.UTC))},
+			expectLen: 1,
+			expectData: &pb.IndicatorResponse{Indicators: []*pb.IndicatorData{
+				{Timeframe: "4h", Sma: 105, Ema: 107, StdDev: 2.5, LowerBollinger: 100, UpperBollinger: 110, Rsi: 45, Volatility: 0.03, Macd: 0.5, MacdSignal: 0.3},
+			}},
+		},
+		{
+			name:      "Fetch 4H indicator data with start time filter (empty response)",
+			request:   &pb.IndicatorRequest{Currency: "btc", Timeframe: "4h", StartTime: timestamppb.New(time.Date(2022, 1, 1, 6, 0, 0, 0, time.UTC))},
+			expectLen: 0,
+		},
+		{
+			name:      "Fetch all 4H indicator data",
+			request:   &pb.IndicatorRequest{Currency: "btc", Timeframe: "4h"},
+			expectLen: 2,
+		},
+		{
+			name:      "Fetch 1D indicator data (empty response)",
+			request:   &pb.IndicatorRequest{Currency: "btc", Timeframe: "1d"},
+			expectLen: 0,
+		},
+		{
+			name:      "Invalid currency",
+			request:   &pb.IndicatorRequest{Currency: "unknown currency", Timeframe: "1h"},
+			expectErr: "resource value(s) is invalid",
+		},
+	}
+
+	// ✅ Execute test cases
+	for _, tc := range testCases {
+		suite.Run(tc.name, func() {
+			response, err := client.GetIndicators(context.Background(), tc.request)
+			// ✅ Handle expected errors
+			if tc.expectErr != "" {
+				assert.Error(suite.T(), err)
+				assert.ErrorContains(suite.T(), err, tc.expectErr)
+				return
+			}
+
+			// ✅ Validate response
+			assert.NoError(suite.T(), err)
+			assert.Equal(suite.T(), tc.expectLen, len(response.Indicators))
+
+			// ✅ Validate indicator data
+			if tc.expectData != nil {
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].Timeframe, response.Indicators[0].Timeframe)
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].Sma, response.Indicators[0].Sma)
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].Ema, response.Indicators[0].Ema)
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].StdDev, response.Indicators[0].StdDev)
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].LowerBollinger, response.Indicators[0].LowerBollinger)
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].UpperBollinger, response.Indicators[0].UpperBollinger)
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].Rsi, response.Indicators[0].Rsi)
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].Volatility, response.Indicators[0].Volatility)
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].Macd, response.Indicators[0].Macd)
+				assert.Equal(suite.T(), tc.expectData.Indicators[0].MacdSignal, response.Indicators[0].MacdSignal)
+			}
+		})
+	}
 }
 
 // ✅ Run the Test Suite

@@ -17,6 +17,52 @@ type IndicatorRepository struct {
 func NewIndicatorRepository() *IndicatorRepository {
 	return &IndicatorRepository{}
 }
+func (indicator *IndicatorRepository) GetRecordsByRequest(request dto.IndicatorRequestDto) ([]dto.IndicatorDto, error) {
+	query := fmt.Sprintf(`
+	SELECT id, timeframe, timestamp, sma, ema, std_dev, lower_bollinger, upper_bollinger, volatility, rsi, macd, macd_signal, data_timestamp
+	FROM indicator_%s_%s`, request.Currency, request.Timeframe)
+
+	var args []any
+
+	if request.StartTime != nil {
+		query += " WHERE timestamp >= $1"
+		args = append(args, request.StartTime)
+	}
+	if request.EndTime != nil {
+		if request.StartTime == nil {
+			query += " WHERE timestamp <= $1"
+			args = append(args, request.EndTime)
+		} else {
+			query += " AND timestamp <= $2"
+			args = append(args, request.EndTime)
+		}
+	}
+	query += fmt.Sprintf(` 
+	ORDER BY %s %s
+	LIMIT %d`, request.SortField, request.SortOrder, request.Limit)
+	rows, err := database.DB.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("💾 error fetching data: %v", err)
+	}
+	defer rows.Close()
+
+	var indicators []dto.IndicatorDto
+
+	for rows.Next() {
+		var indicator dto.IndicatorDto
+		err := rows.Scan(&indicator.Id, &indicator.Timeframe, &indicator.Timestamp, &indicator.SMA, &indicator.EMA, &indicator.StdDev, &indicator.LowerBollinger, &indicator.UpperBollinger, &indicator.Volatility, &indicator.RSI, &indicator.MACD, &indicator.MACDSignal, &indicator.DataTimestamp)
+		if err != nil {
+			return nil, fmt.Errorf("💾 error scanning row: %v", err)
+		}
+		indicators = append(indicators, indicator)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("💾 error iterating rows: %v", err)
+	}
+
+	return indicators, nil
+}
 
 // 1. Have no linked indicator record
 // 2. OR Have is_complete = false in data table

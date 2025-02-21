@@ -30,8 +30,13 @@ func NewIndicatorService(redis redis.RedisServiceInterface) *IndicatorService {
 		redis:      redis,
 	}
 }
+func (service *IndicatorService) GetRecordsByRequest(indicatorRequestDto dto.IndicatorRequestDto) ([]dto.IndicatorDto, error) {
+	if err := service.validator.ValidateCurrencyAndTimeframe(indicatorRequestDto.Currency, indicatorRequestDto.Timeframe); err != nil {
+		return nil, err
+	}
+	return service.repository.GetRecordsByRequest(indicatorRequestDto)
+}
 
-// StoreGroupedRecords
 func (service *IndicatorService) ComputeAndUpsertBatch(currency string, timeframe string) error {
 	log.Printf(config.COLOR_BLUE+"computing indicator for currency:%s timeframe:%s"+config.COLOR_RESET, currency, timeframe)
 	if err := service.validator.ValidateCurrencyAndTimeframe(currency, timeframe); err != nil {
