@@ -126,7 +126,7 @@ func (service *MarketDataService) StoreGroupedRecords(currency string, groupingT
 
 func (service *MarketDataService) publishEvent(eventName string) error {
 	ctx := context.Background()
-	err := service.redis.PublishEvent(ctx, eventName, config.SERVICE_NAME)
+	err := service.redis.PublishEvent(ctx, eventName, config.APPLICATION_NAME)
 	if err != nil {
 		return err
 	}

@@ -7,6 +7,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var APPLICATION_NAME = getEnv("APPLICATION_PORT", "MarketPulse")
+
 // var DefaultCurrencies = []string{"btc", "eth", "bnb", "sol", "trump"}
 var DefaultCurrencies = []string{"btc"}
 var DefaultTimeframes = []string{"1h", "4h", "1d"}
@@ -27,8 +29,6 @@ var FOUR_HOUR = "4h"
 var ONE_DAY = "1d"
 var SEVEN_DAY = "7d"
 var THIRTY_DAY = "30d"
-
-var SERVICE_NAME = "MarketPulse"
 
 var DEFAULT_LIMIT = 100
 var DEFAULT_DATA_REQUEST_SORT_FIELD = "timestamp"

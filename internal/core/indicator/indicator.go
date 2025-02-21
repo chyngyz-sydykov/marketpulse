@@ -232,7 +232,7 @@ func (service *IndicatorService) Volatility(highPrices []float64, lowPrices []fl
 
 func (service *IndicatorService) publishEvent(eventName string) error {
 	ctx := context.Background()
-	err := service.redis.PublishEvent(ctx, eventName, config.SERVICE_NAME)
+	err := service.redis.PublishEvent(ctx, eventName, config.APPLICATION_NAME)
 	if err != nil {
 		return err
 	}
