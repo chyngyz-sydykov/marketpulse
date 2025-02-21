@@ -53,7 +53,7 @@ func StartGRPCServer(GrpcServer *GrpcServer) {
 		log.Fatalf("Failed to listen on port %s: %v", cfg.GrpcPort, err)
 	}
 
-	log.Println("Rating service is running on port 50051")
+	log.Println("Grpc server is running on port 50051")
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("Failed to serve gRPC server: %v", err)
 	}

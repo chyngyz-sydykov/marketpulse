@@ -31,9 +31,23 @@ the protobuf files are stored in different repo https://github.com/chyngyz-sydyk
 generate grpc files `docker exec -it marketpulse bash -c ".scripts/generate_protoc.sh"`
 
 check if the service is registered `grpcurl -plaintext localhost:50051 list`. you should see the following in the console `rating.RatingService` 
-Call a Specific Method
-`grpcurl -plaintext -d '{"book_id": 123}' localhost:50051 rating.RatingService.GetRatings`
 
+in order to communicate with the grpc, do following
+
+1. create a local network `docker network create crypto-bot-network`
+2. after running `docker-compose up` run `docker network inspect crypto-bot-network`
+You should see a json with the list of containers ex:
+```
+"Containers": {
+            "some_hash": {
+                "Name": "some name","
+            },
+            "some_hash": {
+                "Name": "some name",
+            },
+            ...
+},
+```
 # Testing
 
 On initial project setup, please manually create a database for tests. check the database name in env.test file. to run use following commands:
