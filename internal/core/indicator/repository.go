@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/chyngyz-sydykov/marketpulse/internal/dto"
 	"github.com/chyngyz-sydykov/marketpulse/internal/infrastructure/database"
@@ -19,7 +20,7 @@ func NewIndicatorRepository() *IndicatorRepository {
 }
 func (indicator *IndicatorRepository) GetRecordsByRequest(request dto.IndicatorRequestDto) ([]dto.IndicatorDto, error) {
 	query := fmt.Sprintf(`
-	SELECT id, timeframe, timestamp, sma, ema, std_dev, lower_bollinger, upper_bollinger, volatility, rsi, macd, macd_signal, data_timestamp
+	SELECT id, timeframe, timestamp, sma, ema, tr, std_dev, lower_bollinger, upper_bollinger, volatility, rsi, macd, macd_signal, data_timestamp
 	FROM indicator_%s_%s`, request.Currency, request.Timeframe)
 
 	var args []any
@@ -50,7 +51,7 @@ func (indicator *IndicatorRepository) GetRecordsByRequest(request dto.IndicatorR
 
 	for rows.Next() {
 		var indicator dto.IndicatorDto
-		err := rows.Scan(&indicator.Id, &indicator.Timeframe, &indicator.Timestamp, &indicator.SMA, &indicator.EMA, &indicator.StdDev, &indicator.LowerBollinger, &indicator.UpperBollinger, &indicator.Volatility, &indicator.RSI, &indicator.MACD, &indicator.MACDSignal, &indicator.DataTimestamp)
+		err := rows.Scan(&indicator.Id, &indicator.Timeframe, &indicator.Timestamp, &indicator.SMA, &indicator.EMA, &indicator.TR, &indicator.StdDev, &indicator.LowerBollinger, &indicator.UpperBollinger, &indicator.Volatility, &indicator.RSI, &indicator.MACD, &indicator.MACDSignal, &indicator.DataTimestamp)
 		if err != nil {
 			return nil, fmt.Errorf("💾 error scanning row: %v", err)
 		}
@@ -149,6 +150,29 @@ func (repository *IndicatorRepository) getLastRecord(currency, timeframe string)
 	return &record, nil
 }
 
+func (indicator *IndicatorRepository) getPreviousMarketData(currency, timeframe string, timestamp time.Time) (dto.DataDto, error) {
+	query := fmt.Sprintf(`
+		SELECT id, symbol, timeframe, timestamp, open, close, low, high, volume, trend, is_complete
+		FROM data_%s_%s
+		WHERE timestamp < $1
+		ORDER BY timestamp DESC
+		LIMIT 1
+	`, currency, timeframe)
+
+	row := database.DB.QueryRow(query, timestamp)
+
+	var record dto.DataDto
+	err := row.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp, &record.Open, &record.Close, &record.Low, &record.High, &record.Volume, &record.Trend, &record.IsComplete)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return dto.DataDto{}, nil
+		}
+		return dto.DataDto{}, fmt.Errorf("💾 error fetching previous market data: %v", err)
+	}
+
+	return record, nil
+}
+
 func (repository *IndicatorRepository) upsertBatchByTimeFrame(currency string, timeFrame string, records []*dto.IndicatorDto) error {
 	tx, err := database.DB.Begin()
 	if err != nil {
@@ -159,17 +183,18 @@ func (repository *IndicatorRepository) upsertBatchByTimeFrame(currency string, t
 	var placeholders []string
 
 	for i, record := range records {
-		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
-			i*12+1, i*12+2, i*12+3, i*12+4, i*12+5, i*12+6, i*12+7, i*12+8, i*12+9, i*12+10, i*12+11, i*12+12))
-		values = append(values, record.Timeframe, record.Timestamp, record.SMA, record.EMA, record.StdDev, record.LowerBollinger, record.UpperBollinger, record.Volatility, record.RSI, record.MACD, record.MACDSignal, record.DataTimestamp)
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			i*13+1, i*13+2, i*13+3, i*13+4, i*13+5, i*13+6, i*13+7, i*13+8, i*13+9, i*13+10, i*13+11, i*13+12, i*13+13))
+		values = append(values, record.Timeframe, record.Timestamp, record.SMA, record.EMA, record.TR, record.StdDev, record.LowerBollinger, record.UpperBollinger, record.Volatility, record.RSI, record.MACD, record.MACDSignal, record.DataTimestamp)
 	}
 
 	query := fmt.Sprintf(`
-		INSERT INTO indicator_%s_%s (timeframe, timestamp, sma, ema, std_dev, lower_bollinger, upper_bollinger, volatility, rsi, macd, macd_signal, data_timestamp)
+		INSERT INTO indicator_%s_%s (timeframe, timestamp, sma, ema, tr, std_dev, lower_bollinger, upper_bollinger, volatility, rsi, macd, macd_signal, data_timestamp)
 		VALUES %s
 		ON CONFLICT (timestamp) DO UPDATE SET
 			sma = EXCLUDED.sma,
 			ema = EXCLUDED.ema,
+			tr = EXCLUDED.tr,
 			std_dev = EXCLUDED.std_dev,
 			lower_bollinger = EXCLUDED.lower_bollinger,
 			upper_bollinger = EXCLUDED.upper_bollinger,

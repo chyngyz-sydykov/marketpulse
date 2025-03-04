@@ -45,6 +45,7 @@ type IndicatorDto struct {
 	DataTimestamp  time.Time
 	SMA            float64
 	EMA            float64
+	TR             float64
 	StdDev         float64
 	LowerBollinger float64
 	UpperBollinger float64

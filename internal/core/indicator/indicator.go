@@ -54,7 +54,6 @@ func (service *IndicatorService) ComputeAndUpsertBatch(currency string, timefram
 		return nil
 	}
 
-	//var indicatorList []dto.IndicatorDto
 	hoursInGroup := config.HoursByTimeframe[timeframe]
 	ctx := context.Background()
 
@@ -69,6 +68,7 @@ func (service *IndicatorService) ComputeAndUpsertBatch(currency string, timefram
 		if len(filtered1HRecords) == 0 {
 			continue
 		}
+		fmt.Println("filtered1HRecords: ", groupRecord.Timestamp)
 		indicatorDto := &dto.IndicatorDto{}
 		service.setIndicatorMetadata(indicatorDto, groupRecord)
 		err = service.CalculateAllIndicators(filtered1HRecords, indicatorDto)
@@ -92,10 +92,10 @@ func (service *IndicatorService) ComputeAndUpsertBatch(currency string, timefram
 
 }
 
-func (service *IndicatorService) filter1HRecords(record4H dto.DataDto, oneHourRecordsChan <-chan dto.DataDto, hoursInGroup int) []dto.DataDto {
+func (service *IndicatorService) filter1HRecords(groupRecord dto.DataDto, oneHourRecordsChan <-chan dto.DataDto, hoursInGroup int) []dto.DataDto {
 
-	startTime := record4H.Timestamp.Add(-1 * time.Duration(hoursInGroup) * time.Hour)
-	endTime := record4H.Timestamp
+	startTime := groupRecord.Timestamp.Add(-1 * time.Duration(hoursInGroup) * time.Hour)
+	endTime := groupRecord.Timestamp
 
 	var filteredRecords []dto.DataDto
 	for record := range oneHourRecordsChan {
@@ -127,6 +127,7 @@ func (service *IndicatorService) CalculateAllIndicators(history []dto.DataDto, i
 	service.Bollinger(indicatorDto)
 	service.RSI(closePrices, indicatorDto)
 	service.Volatility(highPrices, lowPrices, closePrices, indicatorDto)
+	service.TR(history, indicatorDto)
 	// fmt.Println("closePrices: ", closePrices)
 	// fmt.Println("highPrices: ", highPrices)
 	// fmt.Println("lowPrices: ", lowPrices)
@@ -159,7 +160,7 @@ func (service *IndicatorService) SMA(prices []float64, indicatorDto *dto.Indicat
 
 // Exponential Moving Average (EMA)
 func (service *IndicatorService) EMA(prices []float64, indicatorDto *dto.IndicatorDto, period int) {
-	previousIndicator, err := service.repository.getLastRecord(service.currency, config.FOUR_HOUR)
+	previousIndicator, err := service.repository.getLastRecord(service.currency, config.FOUR_HOUR) // TODO: make timeframe dynamic
 	if err != nil && err != sql.ErrNoRows {
 		return
 	}
@@ -172,6 +173,26 @@ func (service *IndicatorService) EMA(prices []float64, indicatorDto *dto.Indicat
 	multiplier := 2.0 / (float64(period) + 1.0)
 	latestClosePrice := prices[len(prices)-1]
 	indicatorDto.EMA = latestClosePrice*multiplier + previousEma*(1-multiplier)
+}
+
+// True Range (TR)
+func (service *IndicatorService) TR(history []dto.DataDto, indicatorDto *dto.IndicatorDto) {
+	previousData, err := service.repository.getPreviousMarketData(service.currency, config.FOUR_HOUR, indicatorDto.Timestamp)
+	if err != nil && err != sql.ErrNoRows {
+		return
+	}
+	high := history[0].High
+	low := history[0].Low
+	previousClose := 0.0
+	for i := 1; i < len(history); i++ {
+		high = math.Max(history[i].High, high)
+		low = math.Min(history[i].Low, low)
+	}
+	if (previousData == dto.DataDto{}) {
+		previousClose = previousData.Close
+	}
+
+	indicatorDto.TR = math.Max(high-low, math.Max(math.Abs(high-previousClose), math.Abs(low-previousClose)))
 }
 
 // Standard Deviation

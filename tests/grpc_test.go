@@ -168,9 +168,9 @@ func (suite *GrpcTestSuite) TestGrpcIndicatorEndpointShouldReturnCorrectData() {
 
 	suite.marketDataService.UpsertBatchData("btc", records)
 
-	_, err := suite.db.Exec(`INSERT INTO indicator_btc_4h (timeframe, timestamp,data_timestamp, sma, ema, std_dev, lower_bollinger, upper_bollinger, rsi, volatility, macd, macd_signal) VALUES 
-	('4h', '2020-01-01 04:00:00', '2020-01-01 04:00:00', 105, 107, 2.5, 100, 110, 45, 0.03, 0.5, 0.3),
-	('4h', '2020-01-01 08:00:00', '2020-01-01 08:00:00', 205, 207, 3.1, 200, 210, 50, 0.02, 0.6, 0.4)`)
+	_, err := suite.db.Exec(`INSERT INTO indicator_btc_4h (timeframe, timestamp,data_timestamp, sma, ema, tr, std_dev, lower_bollinger, upper_bollinger, rsi, volatility, macd, macd_signal) VALUES 
+	('4h', '2020-01-01 04:00:00', '2020-01-01 04:00:00', 105, 107, 5, 2.5, 100, 110, 45, 0.03, 0.5, 0.3),
+	('4h', '2020-01-01 08:00:00', '2020-01-01 08:00:00', 205, 207, 6, 3.1, 200, 210, 50, 0.02, 0.6, 0.4)`)
 	if err != nil {
 		log.Fatalf("Failed to insert mock indicator data: %v", err)
 	}
@@ -178,7 +178,7 @@ func (suite *GrpcTestSuite) TestGrpcIndicatorEndpointShouldReturnCorrectData() {
 	defer server.Stop()
 
 	// Create gRPC client
-	conn, err := grpc.Dial(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to dial server: %v", err)
 	}
@@ -199,7 +199,7 @@ func (suite *GrpcTestSuite) TestGrpcIndicatorEndpointShouldReturnCorrectData() {
 			request:   &pb.IndicatorRequest{Currency: "btc", Timeframe: "4h", EndTime: timestamppb.New(time.Date(2020, 1, 1, 6, 0, 0, 0, time.UTC))},
 			expectLen: 1,
 			expectData: &pb.IndicatorResponse{Indicators: []*pb.IndicatorData{
-				{Timeframe: "4h", Sma: 105, Ema: 107, StdDev: 2.5, LowerBollinger: 100, UpperBollinger: 110, Rsi: 45, Volatility: 0.03, Macd: 0.5, MacdSignal: 0.3},
+				{Timeframe: "4h", Sma: 105, Ema: 107, Tr: 5, StdDev: 2.5, LowerBollinger: 100, UpperBollinger: 110, Rsi: 45, Volatility: 0.03, Macd: 0.5, MacdSignal: 0.3},
 			}},
 		},
 		{

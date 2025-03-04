@@ -32,7 +32,7 @@ migrate-down:
 	docker run --rm -v $(MIGRATION_PATH):/migrations --network=host $(MIGRATE_IMAGE) -path=/migrations -database "$(DATABASE_URL)" down 1
 
 # Fix dirty migrations
-migrate-fix:
+migrate-force:
 	docker run --rm -v $(MIGRATION_PATH):/migrations --network=host $(MIGRATE_IMAGE) -path=/migrations -database "$(DATABASE_URL)" force $(version)
 
 # Create a new migration file

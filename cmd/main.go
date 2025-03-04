@@ -83,7 +83,7 @@ func getAlotOfData() {
 
 			defer wg.Done()
 
-			records, err := binance.FetchKline(curr, config.ONE_HOUR, 100)
+			records, err := binance.FetchKline(curr, config.ONE_HOUR, 1000)
 			if err != nil {
 				log.Printf("Error fetching data for %s: %v\n", curr, err)
 				return

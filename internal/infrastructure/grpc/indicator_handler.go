@@ -86,6 +86,7 @@ func (handler *IndicatorHandler) mapDtoToResponse(records []dto.IndicatorDto) *p
 			Volatility:     record.Volatility,
 			Macd:           record.MACD,
 			MacdSignal:     record.MACDSignal,
+			Tr:             record.TR,
 		}
 	}
 	return &pb.IndicatorResponse{

@@ -160,6 +160,7 @@ func (suite *IndicatorServiceTestSuite) TestShouldCalculateAndStoreSingleIndicat
 		LowerBollinger: lowerBollinger,
 		UpperBollinger: upperBollinger,
 		RSI:            RSI(ohlcList),
+		TR:             4,
 	}, inidcatorData)
 }
 
@@ -200,17 +201,18 @@ func (suite *IndicatorServiceTestSuite) TestShouldCalculateAndStoreMultipleIndic
 	assert.NoError(suite.T(), err)
 	assert.Equal(suite.T(), 2, count)
 
-	inidcatorData := suite.getIndicatorByTimeframeAndTimestamp("4h", time.Date(2020, 1, 1, 4, 0, 0, 0, time.Now().Location()))
+	indicatorData := suite.getIndicatorByTimeframeAndTimestamp("4h", time.Date(2020, 1, 1, 4, 0, 0, 0, time.Now().Location()))
 	firstIndicatorGroup := ohlcList[:3]
 	lowerBollinger, upperBollinger := Bollinger(firstIndicatorGroup)
 	suite.assertIndicators(dto.IndicatorDto{
 		SMA:            SMA(firstIndicatorGroup),
-		EMA:            inidcatorData.EMA, //TODO fix this
+		EMA:            indicatorData.EMA, //TODO fix this
 		StdDev:         StandardDeviation(firstIndicatorGroup),
 		LowerBollinger: lowerBollinger,
 		UpperBollinger: upperBollinger,
 		RSI:            RSI(firstIndicatorGroup),
-	}, inidcatorData)
+		TR:             TR(firstIndicatorGroup, dto.DataDto{Close: 0}),
+	}, indicatorData)
 
 	secondInidcatorData := suite.getIndicatorByTimeframeAndTimestamp("4h", time.Date(2020, 1, 1, 8, 0, 0, 0, time.Now().Location()))
 	secondIndicatorGroup := ohlcList[3:]
@@ -222,6 +224,7 @@ func (suite *IndicatorServiceTestSuite) TestShouldCalculateAndStoreMultipleIndic
 		LowerBollinger: lowerBollinger,
 		UpperBollinger: upperBollinger,
 		RSI:            RSI(secondIndicatorGroup),
+		TR:             TR(secondIndicatorGroup, dto.DataDto{Close: 0}),
 	}, secondInidcatorData)
 }
 
@@ -287,16 +290,25 @@ func (suite *IndicatorServiceTestSuite) TestShouldCalculateAndStoreMultipleIndic
 		LowerBollinger: lowerBollinger,
 		UpperBollinger: upperBollinger,
 		RSI:            RSI(ohlcList),
+		TR:             TR(ohlcList, dto.DataDto{Close: 0}),
 	}, inidcatorData)
 }
 
 func (suite *IndicatorServiceTestSuite) getIndicatorByTimeframeAndTimestamp(timeframe string, time time.Time) dto.IndicatorDto {
 	var indicator dto.IndicatorDto
-	query := fmt.Sprintf(`SELECT sma, ema, std_dev, lower_bollinger, upper_bollinger, rsi FROM indicator_btc_%s WHERE timestamp = $1`, timeframe)
+	query := fmt.Sprintf(`SELECT sma, ema, tr, std_dev, lower_bollinger, upper_bollinger, rsi FROM indicator_btc_%s WHERE timestamp = $1`, timeframe)
 	err := suite.db.QueryRow(query, time).
-		Scan(&indicator.SMA, &indicator.EMA, &indicator.StdDev, &indicator.LowerBollinger, &indicator.UpperBollinger, &indicator.RSI)
+		Scan(&indicator.SMA, &indicator.EMA, &indicator.TR, &indicator.StdDev, &indicator.LowerBollinger, &indicator.UpperBollinger, &indicator.RSI)
 	assert.NoError(suite.T(), err)
 	return indicator
+}
+
+func (suite *IndicatorServiceTestSuite) getDataByTimeframeAndTimestamp(timeframe string, time time.Time) dto.DataDto {
+	var data dto.DataDto
+	query := fmt.Sprintf(`SELECT open, close, low, high FROM data_btc_%s WHERE timestamp = $1`, timeframe)
+	err := suite.db.QueryRow(query, time).Scan(&data.Open, &data.Close, &data.Low, &data.High)
+	assert.NoError(suite.T(), err)
+	return data
 }
 
 func (suite *IndicatorServiceTestSuite) assertIndicators(expected, actual dto.IndicatorDto) {
@@ -306,6 +318,7 @@ func (suite *IndicatorServiceTestSuite) assertIndicators(expected, actual dto.In
 	assert.Equal(suite.T(), expected.LowerBollinger, actual.LowerBollinger, "LowerBollinger should be equal")
 	assert.Equal(suite.T(), expected.UpperBollinger, actual.UpperBollinger, "UpperBollinger should be equal")
 	assert.Equal(suite.T(), expected.RSI, actual.RSI, "RSI should be equal")
+	assert.Equal(suite.T(), expected.TR, actual.TR, "TR should be equal")
 }
 
 func SMA(prices []oclh) float64 {
@@ -376,6 +389,16 @@ func RSI(prices []oclh) float64 {
 	}
 	rs := avgGain / avgLoss
 	return 100 - (100 / (1 + rs))
+}
+
+func TR(prices []oclh, previousData dto.DataDto) float64 {
+	high := prices[0].High
+	low := prices[0].Low
+	for _, price := range prices {
+		high = math.Max(price.High, high)
+		low = math.Min(price.Low, low)
+	}
+	return math.Max((high - low), math.Max(math.Abs(high-previousData.Close), math.Abs(low-previousData.Close)))
 }
 
 func TestIndicatorServiceTestSuite(t *testing.T) {
