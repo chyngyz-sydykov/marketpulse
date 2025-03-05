@@ -68,7 +68,6 @@ func (service *IndicatorService) ComputeAndUpsertBatch(currency string, timefram
 		if len(filtered1HRecords) == 0 {
 			continue
 		}
-		fmt.Println("filtered1HRecords: ", groupRecord.Timestamp)
 		indicatorDto := &dto.IndicatorDto{}
 		service.setIndicatorMetadata(indicatorDto, groupRecord)
 		err = service.CalculateAllIndicators(filtered1HRecords, indicatorDto)
@@ -211,10 +210,18 @@ func (service *IndicatorService) Bollinger(indicatorDto *dto.IndicatorDto) {
 }
 
 func (service *IndicatorService) RSI(prices []float64, indicatorDto *dto.IndicatorDto) {
+	previousDataList, err := service.repository.getPreviousMarketDataList(service.currency, indicatorDto.Timeframe, indicatorDto.Timestamp, 14)
+	if err != nil && err != sql.ErrNoRows {
+		return
+	}
+	if len(previousDataList) < 2 {
+		indicatorDto.RSI = 50
+		return
+	}
 	gain, loss := 0.0, 0.0
-	period := len(prices)
+	period := len(previousDataList)
 	for i := 1; i < period; i++ {
-		change := prices[i] - prices[i-1]
+		change := previousDataList[i].Close - previousDataList[i-1].Close
 		if change > 0 {
 			gain += change
 		} else {

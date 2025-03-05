@@ -18,7 +18,7 @@ func StartScheduler() {
 	scheduler.Every(1).Hour().Do(func() {
 		log.Println("hourly scheduler...")
 		executeForAllCurrencies(func(currency string) {
-			records, err := binance.FetchKline(currency, config.ONE_HOUR, 100)
+			records, err := binance.FetchKline(currency, config.ONE_HOUR, 1)
 			if err != nil {
 				log.Printf("Error fetching data for %s: %v\n", currency, err)
 				return

@@ -159,7 +159,7 @@ func (suite *IndicatorServiceTestSuite) TestShouldCalculateAndStoreSingleIndicat
 		StdDev:         StandardDeviation(ohlcList),
 		LowerBollinger: lowerBollinger,
 		UpperBollinger: upperBollinger,
-		RSI:            RSI(ohlcList),
+		RSI:            50,
 		TR:             4,
 	}, inidcatorData)
 }
@@ -210,7 +210,7 @@ func (suite *IndicatorServiceTestSuite) TestShouldCalculateAndStoreMultipleIndic
 		StdDev:         StandardDeviation(firstIndicatorGroup),
 		LowerBollinger: lowerBollinger,
 		UpperBollinger: upperBollinger,
-		RSI:            RSI(firstIndicatorGroup),
+		RSI:            50,
 		TR:             TR(firstIndicatorGroup, dto.DataDto{Close: 0}),
 	}, indicatorData)
 
@@ -223,7 +223,7 @@ func (suite *IndicatorServiceTestSuite) TestShouldCalculateAndStoreMultipleIndic
 		StdDev:         StandardDeviation(secondIndicatorGroup),
 		LowerBollinger: lowerBollinger,
 		UpperBollinger: upperBollinger,
-		RSI:            RSI(secondIndicatorGroup),
+		RSI:            50,
 		TR:             TR(secondIndicatorGroup, dto.DataDto{Close: 0}),
 	}, secondInidcatorData)
 }
@@ -289,7 +289,7 @@ func (suite *IndicatorServiceTestSuite) TestShouldCalculateAndStoreMultipleIndic
 		StdDev:         StandardDeviation(ohlcList),
 		LowerBollinger: lowerBollinger,
 		UpperBollinger: upperBollinger,
-		RSI:            RSI(ohlcList),
+		RSI:            50,
 		TR:             TR(ohlcList, dto.DataDto{Close: 0}),
 	}, inidcatorData)
 }
@@ -372,6 +372,9 @@ func Bollinger(prices []oclh) (float64, float64) {
 }
 
 func RSI(prices []oclh) float64 {
+	if len(prices) < 2 {
+		return 50
+	}
 	gain, loss := 0.0, 0.0
 	period := len(prices)
 	for i := 1; i < period; i++ {

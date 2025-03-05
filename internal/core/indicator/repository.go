@@ -173,6 +173,39 @@ func (indicator *IndicatorRepository) getPreviousMarketData(currency, timeframe 
 	return record, nil
 }
 
+func (indicator *IndicatorRepository) getPreviousMarketDataList(currency, timeframe string, timestamp time.Time, limit int) ([]dto.DataDto, error) {
+	query := fmt.Sprintf(`
+		SELECT id, symbol, timeframe, timestamp, open, close, low, high, volume, trend, is_complete
+		FROM data_%s_%s
+		WHERE timestamp < $1
+		ORDER BY timestamp DESC
+		LIMIT $2
+	`, currency, timeframe)
+
+	rows, err := database.DB.Query(query, timestamp, limit)
+
+	if err != nil {
+		return nil, fmt.Errorf("💾 error fetching previous market data list: %v", err)
+	}
+	defer rows.Close()
+
+	var records []dto.DataDto
+	for rows.Next() {
+		var record dto.DataDto
+		err := rows.Scan(&record.Id, &record.Symbol, &record.Timeframe, &record.Timestamp, &record.Open, &record.Close, &record.Low, &record.High, &record.Volume, &record.Trend, &record.IsComplete)
+		if err != nil {
+			return nil, fmt.Errorf("💾 error scanning row: %v", err)
+		}
+		records = append(records, record)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("💾 error iterating rows: %v", err)
+	}
+
+	return records, nil
+}
+
 func (repository *IndicatorRepository) upsertBatchByTimeFrame(currency string, timeFrame string, records []*dto.IndicatorDto) error {
 	tx, err := database.DB.Begin()
 	if err != nil {
